@@ -1,7 +1,7 @@
 {
   "name": "@torque-loop/plugin",
   "version": "0.2.0",
-  "description": "Torque Loop — a Claude Code plugin that evolves ambiguity into shipped, tested, serialized artifacts through evidence-gated loops. Not affiliated with Anthropic.",
+  "description": "Torque Loop — a Claude Code and Codex plugin that evolves ambiguity into shipped, tested, serialized artifacts through evidence-gated loops.",
   "license": "MIT",
   "author": "Danny Gillespie",
   "type": "commonjs",
@@ -25,11 +25,14 @@
     "agents",
     "hooks",
     "templates",
-    ".claude-plugin"
+    ".claude-plugin",
+    ".codex-plugin",
+    ".agents/plugins/marketplace.json"
   ],
   "keywords": [
     "torque-loop",
     "claude-code",
+    "codex",
     "plugin",
     "workflow",
     "quality",

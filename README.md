@@ -8,9 +8,10 @@
 
 **Mutate. Test. Keep the delta.**
 
-A Claude Code plugin for evolving one artifact through evidence-gated improvement loops.
+A Claude Code and Codex plugin for evolving one artifact through evidence-gated improvement
+loops.
 
-> Not affiliated with, endorsed by, or sponsored by Anthropic.
+> Not affiliated with, endorsed by, or sponsored by Anthropic or OpenAI.
 
 Torque Loop is **not a prompt library.** A prompt library gives Claude better words. Torque
 Loop gives Claude a job:
@@ -36,20 +37,19 @@ restarting. *Ambiguity in. Artifact out. Failure tested. State advanced.*
 
 ## Install
 
-Torque Loop has two halves: the **Claude Code plugin** (the slash commands + agents + hooks)
-and the **`ratchet` CLI** (the state engine the commands call). Installing the plugin is the
-main path; the CLI ships inside it and is put on `PATH` automatically while the plugin is
-enabled. The plugin's command namespace stays `/ratchet:*` — the brand is Torque Loop, the
-commands keep the wrench energy.
+Torque Loop has two halves: the **agent plugin** (skills/commands, agents, and Claude-only
+hooks) and the **`ratchet` CLI** (the state engine the skills call). Claude Code exposes the
+skills as `/ratchet:*` slash commands. Codex installs the same skills under the
+`torque-loop` plugin and can use them from Codex CLI or the Codex app.
 
 ### Requirements
 
-- [Claude Code](https://claude.com/claude-code)
+- Claude Code or Codex CLI/app
 - Node.js ≥ 18 (`node --version`)
 - On Windows, the bundled hooks call the CLI via `node`, so no shell-specific setup is
   needed.
 
-### A. Install as a Claude Code plugin — global (available in every project)
+### A. Install as a Claude Code plugin — global
 
 The repo doubles as a single-plugin marketplace, so you can install it directly.
 
@@ -93,9 +93,44 @@ Or vendor it directly inside the project and reference the local path. Either wa
 commands appear only when that project is open. (Prefer an absolute path, or a path relative
 to the settings file, so it resolves on every machine.)
 
-### C. Install the `ratchet` CLI on its own (optional)
+### C. Install as a Codex plugin — CLI
 
-The commands find the CLI automatically, but you can also use `ratchet` from any terminal.
+The repo also contains a Codex marketplace manifest at
+`.agents/plugins/marketplace.json` and a Codex plugin manifest at
+`.codex-plugin/plugin.json`.
+
+```bash
+# 1. get the repo
+git clone https://github.com/TheLucidTech/torque-loop.git
+
+# 2. register this repo as a Codex marketplace
+codex plugin marketplace add /absolute/path/to/torque-loop
+
+# 3. install the plugin from that marketplace
+codex plugin add torque-loop@torque-loop
+
+# 4. verify Codex can see it
+codex plugin list --marketplace torque-loop
+```
+
+For local development, re-run `codex plugin add torque-loop@torque-loop` after manifest
+changes, then start a new Codex thread so the refreshed skills are loaded.
+
+### D. Install as a Codex plugin — app
+
+Register the marketplace once with the Codex CLI:
+
+```bash
+codex plugin marketplace add /absolute/path/to/torque-loop
+```
+
+Then open the Codex app, go to **Plugins**, find **Torque Loop** under Developer Tools,
+and install it. The app and CLI share the configured marketplace source.
+
+### E. Install the `ratchet` CLI on its own (optional)
+
+Claude Code puts the bundled CLI on `PATH` while the plugin is enabled. Codex skills can
+use a globally installed `ratchet`, or you can run the bundled CLI from the plugin root.
 
 ```bash
 cd torque-loop
@@ -122,7 +157,7 @@ ratchet status
 
 State survives plugin updates. It is written to, in order of preference:
 
-1. `$CLAUDE_PLUGIN_DATA` — set by Claude Code for enabled plugins (recommended).
+1. `$CLAUDE_PLUGIN_DATA` — set by Claude Code for enabled plugins.
 2. `$RATCHET_DATA_DIR` — override it yourself.
 3. `~/.ratchet` — fallback.
 
@@ -133,7 +168,9 @@ one shared data directory.
 
 ## Commands
 
-Run `/ratchet:ignite` when you don't know which command to run — it drives the full loop.
+In Claude Code, run `/ratchet:ignite` when you don't know which command to run — it drives
+the full loop. In Codex, ask it to use the matching Torque Loop skill, for example
+`torque-loop:ignite` or `torque-loop:evolve`.
 
 ### Core loop
 
@@ -191,10 +228,9 @@ absolute: **no proof → no keep; no keep → no progress claim.** It is never a
 this better" — it evolves along one chosen pressure vector and records every verdict to
 `.ratchet/evolve-log.jsonl` via the `ratchet-evolve` helper CLI.
 
-> Note: because plugin skills are namespaced by the plugin, the command is invoked as
-> `/ratchet:evolve` (renamed from the older `ratchet-evolve` skill in v0.2.0 — no alias is
-> kept). Drop the `SKILL.md` into `~/.claude/skills/evolve/` to use it as a bare `/evolve`
-> outside the plugin.
+> Note: in Claude Code, the plugin command is invoked as `/ratchet:evolve` (renamed from
+> the older `ratchet-evolve` skill in v0.2.0 — no alias is kept). In Codex, use the
+> installed Torque Loop skill, typically surfaced as `torque-loop:evolve`.
 
 #### One run, end to end
 
@@ -222,10 +258,10 @@ refused at write time — the loop cannot record progress it did not prove.
 ## How it works
 
 ```
-skills/*/SKILL.md   →  Claude-facing operating discipline (the slash commands)
+skills/*/SKILL.md   →  agent-facing operating discipline (Claude slash commands / Codex skills)
 agents/*.md         →  ratchet-builder · ratchet-auditor · ratchet-scribe
-hooks/hooks.json    →  session-start init · post-edit tracking · stop-compile reminder
-bin/ratchet         →  the state CLI (added to PATH while the plugin is enabled)
+hooks/hooks.json    →  Claude-only session-start init · post-edit tracking · stop reminder
+bin/ratchet         →  the state CLI (PATH in Claude, global or plugin-root path in Codex)
 bin/ratchet-evolve  →  the evolution-loop helper CLI (snapshot · score · verify · log)
 src/*.js            →  state, scoring, ledger, artifact indexing, snapshots, rendering
 src/evolve/*.js     →  snapshot · pressure · mutation scoring · verify runner · journal
@@ -283,8 +319,8 @@ public issue tracker.
 
 MIT © 2026 Danny Gillespie
 
-Not affiliated with, endorsed by, or sponsored by Anthropic. "Claude" and "Claude Code" are
-trademarks of Anthropic.
+Not affiliated with, endorsed by, or sponsored by Anthropic or OpenAI. "Claude" and
+"Claude Code" are trademarks of Anthropic. "Codex" is a trademark of OpenAI.
 
 ---
 

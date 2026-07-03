@@ -314,8 +314,8 @@ function frontmatter(text) {
 }
 
 // "Is my plugin healthy?" — validate the plugin shape against what Claude Code
-// expects, plus version alignment and a live state/snapshot check. Exits non-zero
-// on any failure so CI and `npm test` can gate a release on it.
+// and Codex expect, plus version alignment and a live state/snapshot check.
+// Exits non-zero on any failure so CI and `npm test` can gate a release on it.
 function cmdDoctor(cwd, asJson) {
   const root = PLUGIN_ROOT;
   const checks = [];
@@ -333,23 +333,48 @@ function cmdDoctor(cwd, asJson) {
 
   const pkg = readJsonFile('package.json');
   add('package.json parses', pkg.ok, pkg.ok ? '' : pkg.error);
-  const plugin = readJsonFile('.claude-plugin/plugin.json');
-  add('.claude-plugin/plugin.json parses', plugin.ok, plugin.ok ? '' : plugin.error);
-  const market = readJsonFile('.claude-plugin/marketplace.json');
-  add('.claude-plugin/marketplace.json parses', market.ok, market.ok ? '' : market.error);
+  const claudePlugin = readJsonFile('.claude-plugin/plugin.json');
+  add('.claude-plugin/plugin.json parses', claudePlugin.ok, claudePlugin.ok ? '' : claudePlugin.error);
+  const claudeMarket = readJsonFile('.claude-plugin/marketplace.json');
+  add('.claude-plugin/marketplace.json parses', claudeMarket.ok, claudeMarket.ok ? '' : claudeMarket.error);
+  const codexPlugin = readJsonFile('.codex-plugin/plugin.json');
+  add('.codex-plugin/plugin.json parses', codexPlugin.ok, codexPlugin.ok ? '' : codexPlugin.error);
+  const codexMarket = readJsonFile('.agents/plugins/marketplace.json');
+  add('.agents/plugins/marketplace.json parses', codexMarket.ok, codexMarket.ok ? '' : codexMarket.error);
 
-  if (pkg.ok && plugin.ok && market.ok) {
+  if (pkg.ok && claudePlugin.ok && claudeMarket.ok && codexPlugin.ok) {
     const pv = pkg.data.version;
     const others = [
-      ['plugin.json', plugin.data.version],
-      ['marketplace.metadata', market.data.metadata && market.data.metadata.version],
-      ['marketplace.plugins[0]', market.data.plugins && market.data.plugins[0] && market.data.plugins[0].version],
+      ['.claude-plugin/plugin.json', claudePlugin.data.version],
+      ['.claude-plugin/marketplace.metadata', claudeMarket.data.metadata && claudeMarket.data.metadata.version],
+      ['.claude-plugin/marketplace.plugins[0]', claudeMarket.data.plugins && claudeMarket.data.plugins[0] && claudeMarket.data.plugins[0].version],
+      ['.codex-plugin/plugin.json', codexPlugin.data.version],
     ];
     const mismatch = others.filter(([, v]) => v !== pv).map(([k, v]) => `${k}=${v}`);
     add('versions aligned', mismatch.length === 0, mismatch.length ? `package=${pv} but ${mismatch.join(', ')}` : `all ${pv}`);
   }
 
-  for (const d of ['skills', 'agents', 'hooks', 'bin', 'src']) {
+  if (codexPlugin.ok) {
+    const iface = codexPlugin.data.interface || {};
+    const required = ['displayName', 'shortDescription', 'longDescription', 'developerName', 'category'];
+    const missing = required.filter((field) => !iface[field]);
+    add('Codex manifest required interface fields exist', missing.length === 0, missing.join(', '));
+    add('Codex manifest points at skills', codexPlugin.data.skills === './skills/');
+  }
+
+  if (codexPlugin.ok && codexMarket.ok) {
+    const plugins = Array.isArray(codexMarket.data.plugins) ? codexMarket.data.plugins : [];
+    const entry = plugins.find((p) => p && p.name === codexPlugin.data.name);
+    add('Codex marketplace entry exists', Boolean(entry), codexPlugin.data.name);
+    if (entry) {
+      const sourceOk = entry.source && entry.source.source === 'local' && entry.source.path === './';
+      const policyOk = entry.policy && entry.policy.installation === 'AVAILABLE' && entry.policy.authentication === 'ON_INSTALL';
+      add('Codex marketplace source is local repo root', sourceOk);
+      add('Codex marketplace policy is installable', policyOk);
+    }
+  }
+
+  for (const d of ['.agents', '.claude-plugin', '.codex-plugin', 'skills', 'agents', 'hooks', 'bin', 'src']) {
     const p = path.join(root, d);
     add(`dir ${d}/ exists`, fs.existsSync(p) && fs.statSync(p).isDirectory());
   }

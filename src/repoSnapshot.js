@@ -28,9 +28,8 @@ const IGNORE_DIRS = new Set([
 ]);
 
 // Dot-directories that ARE meaningful to a plugin/repo and must not be hidden.
-// Without this, a blanket dot-dir skip loses .claude-plugin, .github, etc. — the
-// exact directories a Claude Code plugin lives in.
-const DOT_DIR_ALLOWLIST = new Set(['.claude', '.claude-plugin', '.github', '.ratchet']);
+// Without this, a blanket dot-dir skip loses plugin manifests and CI metadata.
+const DOT_DIR_ALLOWLIST = new Set(['.agents', '.claude', '.claude-plugin', '.codex-plugin', '.github', '.ratchet']);
 
 function shouldSkipDir(name) {
   if (IGNORE_DIRS.has(name)) return true;

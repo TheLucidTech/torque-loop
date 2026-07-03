@@ -140,11 +140,13 @@ ok('corrupt ledger.json is backed up, not silently lost', () => {
 
 ok('repo snapshot sees allowlisted dot dirs, skips .git / node_modules', () => {
   const proj = path.join(tmp, 'snap-fixture');
-  for (const d of ['.claude-plugin', '.github', '.git', 'node_modules', 'src']) {
+  for (const d of ['.agents', '.claude-plugin', '.codex-plugin', '.github', '.git', 'node_modules', 'src']) {
     fs.mkdirSync(path.join(proj, d), { recursive: true });
   }
   const snap = repo.snapshot(proj);
+  assert.ok(snap.dirs.includes('.agents'), '.agents is visible');
   assert.ok(snap.dirs.includes('.claude-plugin'), '.claude-plugin is visible');
+  assert.ok(snap.dirs.includes('.codex-plugin'), '.codex-plugin is visible');
   assert.ok(snap.dirs.includes('.github'), '.github is visible');
   assert.ok(!snap.dirs.includes('.git'), '.git is skipped');
   assert.ok(!snap.dirs.includes('node_modules'), 'node_modules is skipped');

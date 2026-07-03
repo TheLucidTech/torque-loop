@@ -22,7 +22,10 @@ ratchet status
 ratchet snapshot repo
 ```
 
-If `ratchet` is not on PATH, call it as `node "$CLAUDE_PLUGIN_ROOT/bin/ratchet"`.
+If `ratchet` is not on PATH, call the plugin-local CLI as
+`node "<plugin root>/bin/ratchet"`. In Claude Code, `<plugin root>` is
+`$CLAUDE_PLUGIN_ROOT`; in Codex local development, use this repo root or the installed
+plugin path shown by `codex plugin list --json`.
 
 ## The pipeline (run all seven; do not skip)
 
