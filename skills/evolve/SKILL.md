@@ -1,5 +1,5 @@
 ---
-name: ratchet-evolve
+name: evolve
 description: "Evolve one artifact through a bounded, evidence-gated mutation loop — lock target, snapshot baseline, apply one pressure, generate candidate deltas, judge, patch, verify, keep or revert, record state, and name the next edge. Not brainstorming and not a general 'make this better': every kept change must be proven. Use to harden a specific code file, prompt, skill, test suite, README, spec, or workflow along a chosen pressure vector."
 argument-hint: "<target> --goal \"<improvement>\" [--iterations 2] [--test \"<cmd>\"] [--mode code|prompt|docs|workflow|auto] [--write]"
 allowed-tools:
@@ -35,7 +35,7 @@ No state → no loop continuity.
 ## Invocation
 
 ```
-/ratchet-evolve <target> --goal "<improvement>" [--iterations 2] [--test "<cmd>"] [--mode code|prompt|docs|workflow|auto] [--write]
+/ratchet:evolve <target> --goal "<improvement>" [--iterations 2] [--test "<cmd>"] [--mode code|prompt|docs|workflow|auto] [--write]
 ```
 
 Parse from `$ARGUMENTS`: the target artifact, the `--goal`, `--iterations` (default **2**),
@@ -114,7 +114,13 @@ ratchet-evolve log append '{"target":"...","goal":"...","iteration":1,"pressure"
 Appends to `<project>/.ratchet/evolve-log.jsonl`.
 
 ### 10. NEXT EDGE
-Name the next mutation: small, specific, testable, attached to the **same** artifact.
+Name the next mutation: small, specific, testable, attached to the **same** artifact. It is
+persisted with the event and readable next session via `ratchet-evolve next`. Check
+`ratchet-evolve status` for the running kept/reverted/asked tally.
+
+Copy-paste shapes live in `templates/`: `evolve-event.json` (the log-append payload),
+`evolve-manual-checks.md` (manual evidence when there is no test command), and
+`evolve-report.md` (the output contract below).
 
 ## Stop rules
 

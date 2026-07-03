@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 'use strict';
 
-// Deterministic helpers for the /ratchet-evolve loop. The reasoning lives in
-// skills/ratchet-evolve/SKILL.md; this binary provides snapshot, scoring,
+// Deterministic helpers for the /ratchet:evolve loop. The reasoning lives in
+// skills/evolve/SKILL.md; this binary provides snapshot, scoring,
 // verification, and the evolution journal.
 
 try {
