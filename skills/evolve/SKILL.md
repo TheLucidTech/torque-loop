@@ -44,7 +44,9 @@ without it, propose patches but do not modify files). If the target or goal is m
 straight to **ASK**.
 
 The deterministic helpers live in the `ratchet-evolve` CLI (call via Bash; fall back to
-`node "$CLAUDE_PLUGIN_ROOT/bin/ratchet-evolve"` if not on PATH).
+`node "<plugin root>/bin/ratchet-evolve"` if not on PATH). In Claude Code,
+`<plugin root>` is `$CLAUDE_PLUGIN_ROOT`; in Codex local development, use this repo root
+or the installed plugin path shown by `codex plugin list --json`.
 
 ## The loop
 

@@ -1,0 +1,41 @@
+{
+  "name": "torque-loop",
+  "version": "0.2.0",
+  "description": "Torque Loop evolves ambiguous work into shipped, tested, serialized artifacts through evidence-gated loops.",
+  "author": {
+    "name": "Danny Gillespie",
+    "url": "https://github.com/TheLucidTech"
+  },
+  "homepage": "https://github.com/TheLucidTech/torque-loop",
+  "repository": "https://github.com/TheLucidTech/torque-loop",
+  "license": "MIT",
+  "keywords": [
+    "workflow",
+    "quality",
+    "validation",
+    "skills",
+    "state",
+    "qa",
+    "decision"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Torque Loop",
+    "shortDescription": "Evidence-gated workflow skills and ratchet state helpers",
+    "longDescription": "Use Torque Loop to lock vague goals, rank blockers, build small artifacts, attack assumptions, patch failures, serialize state, and run bounded evidence-gated evolution loops.",
+    "developerName": "Danny Gillespie",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Interactive",
+      "Read",
+      "Write"
+    ],
+    "defaultPrompt": [
+      "Use Torque Loop to lock and ship this task.",
+      "Run an evidence-gated evolve pass on this file.",
+      "Attack this plan and patch only what fails."
+    ],
+    "websiteURL": "https://github.com/TheLucidTech/torque-loop",
+    "brandColor": "#111827"
+  }
+}

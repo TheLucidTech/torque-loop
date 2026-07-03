@@ -1,7 +1,7 @@
 'use strict';
 
 // Zero-dependency plugin-shape test. Run: node test/plugin-shape.test.js
-// Validates the packaging surface Claude Code expects — so a broken plugin
+// Validates the packaging surface Claude Code and Codex expect — so a broken plugin
 // package (missing SKILL.md, drifted version, stale command name) fails CI
 // before a user ever installs it. Reads the real repo, writes nothing.
 
@@ -26,21 +26,46 @@ function ok(name, fn) {
 }
 
 const pkg = readJson('package.json');
-const plugin = readJson('.claude-plugin/plugin.json');
-const market = readJson('.claude-plugin/marketplace.json');
+const claudePlugin = readJson('.claude-plugin/plugin.json');
+const claudeMarket = readJson('.claude-plugin/marketplace.json');
+const codexPlugin = readJson('.codex-plugin/plugin.json');
+const codexMarket = readJson('.agents/plugins/marketplace.json');
 
 ok('manifests exist and parse', () => {
   assert.ok(pkg.version, 'package.json has a version');
-  assert.ok(plugin.version, 'plugin.json has a version');
-  assert.ok(market.metadata && market.metadata.version, 'marketplace metadata has a version');
-  assert.ok(Array.isArray(market.plugins) && market.plugins.length, 'marketplace lists plugins');
+  assert.ok(claudePlugin.version, 'Claude plugin.json has a version');
+  assert.ok(claudeMarket.metadata && claudeMarket.metadata.version, 'Claude marketplace metadata has a version');
+  assert.ok(Array.isArray(claudeMarket.plugins) && claudeMarket.plugins.length, 'Claude marketplace lists plugins');
+  assert.ok(codexPlugin.version, 'Codex plugin.json has a version');
+  assert.ok(Array.isArray(codexMarket.plugins) && codexMarket.plugins.length, 'Codex marketplace lists plugins');
 });
 
 ok('versions are aligned across every surface', () => {
   const v = pkg.version;
-  assert.strictEqual(plugin.version, v, 'plugin.json version matches package.json');
-  assert.strictEqual(market.metadata.version, v, 'marketplace metadata version matches package.json');
-  assert.strictEqual(market.plugins[0].version, v, 'marketplace plugin version matches package.json');
+  assert.strictEqual(claudePlugin.version, v, 'Claude plugin.json version matches package.json');
+  assert.strictEqual(claudeMarket.metadata.version, v, 'Claude marketplace metadata version matches package.json');
+  assert.strictEqual(claudeMarket.plugins[0].version, v, 'Claude marketplace plugin version matches package.json');
+  assert.strictEqual(codexPlugin.version, v, 'Codex plugin.json version matches package.json');
+});
+
+ok('Codex manifest has required install metadata', () => {
+  assert.strictEqual(codexPlugin.name, 'torque-loop', 'Codex plugin name matches repo identity');
+  assert.strictEqual(codexPlugin.skills, './skills/', 'Codex manifest points at skills');
+  assert.ok(codexPlugin.author && codexPlugin.author.name, 'Codex manifest has author.name');
+  assert.ok(codexPlugin.interface, 'Codex manifest has interface metadata');
+  for (const field of ['displayName', 'shortDescription', 'longDescription', 'developerName', 'category']) {
+    assert.ok(codexPlugin.interface[field], `Codex interface.${field} exists`);
+  }
+  assert.ok(Array.isArray(codexPlugin.interface.capabilities), 'Codex interface.capabilities is an array');
+  assert.ok(Array.isArray(codexPlugin.interface.defaultPrompt), 'Codex interface.defaultPrompt is an array');
+});
+
+ok('Codex marketplace installs this repo as a local plugin source', () => {
+  const entry = codexMarket.plugins.find((p) => p.name === codexPlugin.name);
+  assert.ok(entry, 'Codex marketplace has a torque-loop entry');
+  assert.deepStrictEqual(entry.source, { source: 'local', path: './' });
+  assert.deepStrictEqual(entry.policy, { installation: 'AVAILABLE', authentication: 'ON_INSTALL' });
+  assert.strictEqual(entry.category, 'Developer Tools');
 });
 
 ok('CLI VERSION constants match package.json', () => {
@@ -64,7 +89,7 @@ ok('every bin target from package.json exists', () => {
 });
 
 ok('required plugin directories exist', () => {
-  for (const d of ['skills', 'agents', 'hooks', 'bin', 'src']) {
+  for (const d of ['.agents', '.claude-plugin', '.codex-plugin', 'skills', 'agents', 'hooks', 'bin', 'src']) {
     assert.ok(fs.existsSync(path.join(root, d)), `${d}/ exists`);
   }
 });

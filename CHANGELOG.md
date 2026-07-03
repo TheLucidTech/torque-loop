@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Codex install metadata: `.codex-plugin/plugin.json` plus a repo-local
+  `.agents/plugins/marketplace.json`, so the plugin can be registered and installed by
+  Codex CLI and surfaced in the Codex app.
+
+### Changed
+
+- Package metadata, `ratchet doctor`, and plugin-shape tests now cover both Claude Code
+  and Codex manifests.
+- npm packaging includes the Codex marketplace file explicitly as
+  `.agents/plugins/marketplace.json`, without packaging the whole `.agents` tree.
+- Repo snapshots now surface `.agents` and `.codex-plugin` alongside the existing
+  plugin-critical dot directories.
+
 ## [0.2.0] - 2026-07-03 — Proof Gate
 
 Hardening, not expansion. This release makes the loop's philosophy mechanically true:
