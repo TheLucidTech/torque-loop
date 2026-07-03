@@ -15,7 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Package metadata and plugin-shape tests now cover both Claude Code and Codex manifests.
+- Package metadata, `ratchet doctor`, and plugin-shape tests now cover both Claude Code
+  and Codex manifests.
+- npm packaging includes the Codex marketplace file explicitly as
+  `.agents/plugins/marketplace.json`, without packaging the whole `.agents` tree.
 - Repo snapshots now surface `.agents` and `.codex-plugin` alongside the existing
   plugin-critical dot directories.
 
