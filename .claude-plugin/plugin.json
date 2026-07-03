@@ -16,7 +16,5 @@
     "state",
     "qa",
     "decision"
-  ],
-  "skills": "./skills",
-  "hooks": "./hooks/hooks.json"
+  ]
 }
