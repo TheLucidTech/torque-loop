@@ -56,5 +56,18 @@ ratchet state set objective "<operation> <object> → <output shape>, proof: <pr
 ratchet state set phase lock
 ```
 
+## Meter what follows
+
+Once the target is locked, score its uncertainty so you spend only the loop it
+earns — don't reflexively run the full ratchet on a reversible one-liner:
+
+```
+ratchet score aperture '{"ambiguity":_,"terrain":_,"taste":_,"blastRadius":_,"reversibility":_}'
+```
+
+- **A0–A1** → go straight to `/ratchet:build`, then `/ratchet:verify`.
+- **A2–A3** → run `/ratchet:ignite`'s metered pipeline.
+- **A4** → do not build yet; produce options and lock constraints first.
+
 Then point forward: the locked target's smallest artifact is now the target of
 `/ratchet:build`, or run `/ratchet:auction` first if the path to it is blocked.

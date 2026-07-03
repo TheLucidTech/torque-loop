@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-07-03 — Aperture
+
+0.2 gated proof; 0.3 gated the *seam* of that proof. 0.4 adds the dial that decides how
+much of the loop to run at all: **spend the full ratchet only when uncertainty earns it,
+and snap when it doesn't.**
+
+### Added
+
+- **Aperture dial** — `ratchet score aperture <json>` scores five uncertainty dimensions
+  (`ambiguity`, `terrain`, `taste`, `blastRadius`, `reversibility`, each 0–2), maps the
+  total to a level A0–A4, and returns the exact ratchet skill sequence to run at that
+  depth — from `build → verify` (A0 Snap) up to `lock → cut → decide` with **no build**
+  until constraints are locked (A4 Max). A missing dimension defaults to neutral (1),
+  never certain (0), so unknown uncertainty opens the aperture rather than closing it.
+- **Aperture Read in `/ratchet:ignite`** — the master loop now meters itself: it scores
+  the task first and runs only the depth uncertainty earns, instead of always running all
+  seven steps. `/ratchet:lock` gained a matching "meter what follows" note.
+
+### Changed
+
+- `/ratchet:ignite` reframed from "run all seven; do not skip" to "run the aperture's
+  metered sequence" — the seven-step pipeline is now the A2 default, not the floor.
+- Bumped package, both plugin manifests, and the marketplace manifest to `0.4.0`.
+
 ## [0.3.0] - 2026-07-03 — Seam Gate
 
 Where 0.2 made the loop **require proof**, 0.3 asks whether the proof is about the
@@ -157,7 +181,8 @@ Initial public release.
 - Single-plugin marketplace manifest so the repo installs directly as a Claude Code plugin.
 - Zero-dependency smoke test suites for the state engine and the evolution helpers.
 
-[Unreleased]: https://github.com/TheLucidTech/torque-loop/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/TheLucidTech/torque-loop/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/TheLucidTech/torque-loop/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/TheLucidTech/torque-loop/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/TheLucidTech/torque-loop/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/TheLucidTech/torque-loop/releases/tag/v0.1.0

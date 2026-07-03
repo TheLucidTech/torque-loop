@@ -123,4 +123,67 @@ function scoreConfidence(state) {
   return { score, band, loopClear, penalties, openDefects: openDefects.length };
 }
 
-module.exports = { scoreFriction, scoreConfidence, clamp, isDefectOpen, TERMINAL_DEFECT_STATUSES };
+// ---------------------------------------------------------------------------
+// Aperture (0.4). The dial that meters how much of the loop to run. Score five
+// uncertainty dimensions 0..2, sum to 0..10, map to A0..A4, and emit the ratchet
+// skill sequence to run at that depth. The point is anti-ceremony: spend the
+// full loop only when uncertainty earns it; snap when it doesn't.
+//   ambiguity     : are goals / acceptance criteria / constraints unclear?
+//   terrain       : is the codebase / domain / tooling unfamiliar?
+//   taste         : would the user recognize the right answer only once shown?
+//   blastRadius   : could it hit data, security, production, many files/users?
+//   reversibility : is the change hard to undo or validate?
+// ---------------------------------------------------------------------------
+
+const APERTURE_DIMENSIONS = ['ambiguity', 'terrain', 'taste', 'blastRadius', 'reversibility'];
+
+const APERTURE_LEVELS = [
+  { max: 2, level: 'A0', name: 'Snap', implement: true, sequence: ['build', 'verify'] },
+  { max: 4, level: 'A1', name: 'Narrow', implement: true, sequence: ['lock', 'build', 'verify', 'compile'] },
+  { max: 6, level: 'A2', name: 'Working', implement: true, sequence: ['lock', 'cut', 'build', 'attack', 'patch', 'verify', 'compile'] },
+  { max: 8, level: 'A3', name: 'Wide', implement: true, sequence: ['lock', 'auction', 'cut', 'decide', 'build', 'attack', 'patch', 'compile'] },
+  { max: 10, level: 'A4', name: 'Max', implement: false, sequence: ['lock', 'cut', 'decide'] },
+];
+
+// A missing dimension defaults to 1 (neutral), never 0 — treating unknown
+// uncertainty as "certain" would under-open the aperture, the exact failure the
+// dial exists to prevent.
+function apertureDim(dims, key) {
+  const v = dims ? dims[key] : undefined;
+  return v == null ? 1 : clamp(v, 0, 2);
+}
+
+function scoreAperture(dims) {
+  if (dims == null || typeof dims !== 'object' || Array.isArray(dims)) {
+    throw new Error(
+      'aperture expects a JSON object of dimensions (ambiguity, terrain, taste, blastRadius, reversibility), each 0-2'
+    );
+  }
+  const scored = {};
+  let total = 0;
+  for (const key of APERTURE_DIMENSIONS) {
+    const v = apertureDim(dims, key);
+    scored[key] = v;
+    total += v;
+  }
+  const band = APERTURE_LEVELS.find((b) => total <= b.max) || APERTURE_LEVELS[APERTURE_LEVELS.length - 1];
+  return {
+    score: total, // 0..10
+    level: band.level, // A0..A4
+    name: band.name,
+    implement: band.implement, // A4: do NOT build until constraints are locked
+    sequence: band.sequence.slice(), // ratchet skills to run at this depth
+    dimensions: scored,
+  };
+}
+
+module.exports = {
+  scoreFriction,
+  scoreConfidence,
+  scoreAperture,
+  clamp,
+  isDefectOpen,
+  TERMINAL_DEFECT_STATUSES,
+  APERTURE_DIMENSIONS,
+  APERTURE_LEVELS,
+};

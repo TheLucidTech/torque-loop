@@ -370,8 +370,12 @@ function cmdScore(cwd, sub, rest, asJson) {
       state.saveState(cwd, s);
       return out(md.confidence(s));
     }
+    case 'aperture': {
+      const result = scoring.scoreAperture(readPayload(rest[0]));
+      return out(asJson ? JSON.stringify(result, null, 2) : md.aperture(result));
+    }
     default:
-      throw new Error(`unknown score subcommand: ${sub} (friction | confidence)`);
+      throw new Error(`unknown score subcommand: ${sub} (friction | confidence | aperture)`);
   }
 }
 
@@ -632,6 +636,7 @@ function help() {
       'SCORING',
       '  ratchet score friction <json>      rank obstacles ([{name,leverage,certainty,speed,risk}])',
       '  ratchet score confidence           compute session confidence + loop-clear',
+      '  ratchet score aperture <json>      meter loop depth from uncertainty ({ambiguity,terrain,taste,blastRadius,reversibility} 0-2)',
       '',
       'CONTEXT',
       '  ratchet snapshot repo [path]       cheap repo read (files, dirs, git)',
