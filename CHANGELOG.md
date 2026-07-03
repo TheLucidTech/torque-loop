@@ -7,20 +7,74 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-07-03 — Seam Gate
+
+Where 0.2 made the loop **require proof**, 0.3 asks whether the proof is about the
+thing you are actually shipping. A proxy evaluation can produce the right-looking
+number and still point at the wrong decision, so a production `KEEP` now needs
+evidence from the exact ship seam — and remediated defects can finally be cleared,
+waived, or superseded through the CLI instead of blocking confidence forever.
+
+**No proof → no keep** (0.2). **Wrong proof → no ship** (0.3).
+
 ### Added
 
+- **Defect lifecycle** — `ratchet defect resolve | reopen | waive | supersede`,
+  plus `list` and `get`. `resolve` requires `--evidence`; `waive` requires
+  `--owner` and `--reason`; `supersede` links the replacement with `--by`. Each
+  transition is logged per-defect and mirrored into the QA ledger. This is the
+  mutation 0.2 lacked: a defect could be born but never cleared, so remediated
+  work stayed confidence-blocking forever.
+- **Seam-fidelity metadata on evolution events** — a verification can now record
+  `evidenceType`, `method`, `independentFromBuilderMethod`, `testedSeam`,
+  `shipSeam`, `seamMatch`, and `proxyWarning`.
+- **Seam gate** — a production-code (`mode: code`) `KEEP` is rejected unless the
+  evidence seam is an exact match for the ship seam, or a named human waiver is
+  supplied. Verification that repeats the builder's own method is rejected as not
+  independent.
+- **`ratchet retract <id>`** — retract an artifact whose claim became false or
+  obsolete (`--reason`, `--superseded-by`). Provenance is preserved
+  (`keptForProvenance`), and a retracted artifact's holes stop draining confidence.
+- **`ratchet git status-refs`** — base-qualified git status: every ahead/behind
+  count names the ref it was measured against — never a bare "ahead of main".
+- **`ratchet doctor cold-start`** — scans for stale steering that would start the
+  next session in the wrong world. Generic ratchet-state checks always run;
+  project operator surfaces (goal files, decision sheets) are an opt-in adapter
+  via `.ratchet/cold-start.json`. No workspace path is hardcoded, and a
+  declared-but-unimplemented check warns rather than silently passing. See
+  `templates/cold-start.example.json`.
+- **`REVERTED_AND_LEARNED`** — a first-class successful evolve outcome for a
+  mutation reverted after verification that still left a reusable lesson. Evolve
+  status counts it distinctly: corrected knowledge, no bad code kept.
 - Codex install metadata: `.codex-plugin/plugin.json` plus a repo-local
   `.agents/plugins/marketplace.json`, so the plugin can be registered and installed by
   Codex CLI and surfaced in the Codex app.
 
 ### Changed
 
+- Confidence scoring now treats `waived` and `superseded` defects as terminal
+  (like `resolved` / `closed`) — a change proven necessary by a failing test
+  before it was made. `resolved` handling was already correct and was left
+  untouched.
+- The terminal-defect predicate is centralized in `scoring.isDefectOpen` and
+  consumed by the scorer, the state summary, and the QA ledger, so a cleared
+  defect can never read as open on one surface while draining on another.
+- The `ratchet` CLI gained a real `--key value` flag parser for subcommands that
+  carry values (the router previously treated every `--flag` as boolean).
 - Package metadata, `ratchet doctor`, and plugin-shape tests now cover both Claude Code
   and Codex manifests.
 - npm packaging includes the Codex marketplace file explicitly as
   `.agents/plugins/marketplace.json`, without packaging the whole `.agents` tree.
 - Repo snapshots now surface `.agents` and `.codex-plugin` alongside the existing
   plugin-critical dot directories.
+- Bumped package, both plugin manifests, and the marketplace manifest to `0.3.0`.
+
+### Fixed
+
+- Remediated defects could never be cleared through the CLI, so they blocked
+  confidence permanently. They can now be resolved, waived, or superseded.
+- A production `KEEP` could be justified by a proxy evaluation that measured a
+  different seam than the one it ships on. The seam gate now blocks that.
 
 ## [0.2.0] - 2026-07-03 — Proof Gate
 
@@ -103,6 +157,7 @@ Initial public release.
 - Single-plugin marketplace manifest so the repo installs directly as a Claude Code plugin.
 - Zero-dependency smoke test suites for the state engine and the evolution helpers.
 
-[Unreleased]: https://github.com/TheLucidTech/torque-loop/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/TheLucidTech/torque-loop/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/TheLucidTech/torque-loop/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/TheLucidTech/torque-loop/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/TheLucidTech/torque-loop/releases/tag/v0.1.0

@@ -17,7 +17,7 @@ function bullets(items, fmt) {
 
 function stateSummary(state) {
   const conf = scoring.scoreConfidence(state);
-  const openDefects = (state.defects || []).filter((d) => d.status !== 'resolved' && d.status !== 'closed');
+  const openDefects = (state.defects || []).filter(scoring.isDefectOpen);
   const openLoops = (state.openLoops || []).filter((l) => l.status !== 'closed');
   const untested = (state.assumptions || []).filter((a) => a.status !== 'tested' && a.status !== 'killed');
   const lastArtifact = (state.artifacts || [])[state.artifacts.length - 1];
@@ -90,6 +90,56 @@ function confidence(state) {
   return out.join('\n');
 }
 
+// `○` = still draining confidence, `●` = terminal (resolved/waived/superseded).
+function defectList(defects) {
+  if (!defects || !defects.length) return '_no defects recorded_';
+  const lines = ['### Defects'];
+  for (const d of defects) {
+    const open = scoring.isDefectOpen(d);
+    lines.push(`- ${open ? '○' : '●'} \`${d.id}\` [${d.severity}] ${d.summary} — **${d.status}**`);
+  }
+  const draining = defects.filter(scoring.isDefectOpen).length;
+  lines.push('');
+  lines.push(`_${draining} draining · ${defects.length - draining} terminal · ${defects.length} total_`);
+  return lines.join('\n');
+}
+
+function defectOne(d) {
+  const lines = [];
+  lines.push(`### Defect \`${d.id}\``);
+  lines.push(`- **Severity:** ${d.severity}`);
+  lines.push(`- **Status:** ${d.status}${scoring.isDefectOpen(d) ? ' (draining confidence)' : ' (terminal — not draining)'}`);
+  lines.push(`- **Summary:** ${d.summary}`);
+  if (d.evidence) lines.push(`- **Resolution evidence:** ${d.evidence}`);
+  if (d.waivedBy) lines.push(`- **Waived by:** ${d.waivedBy}${d.waiveReason ? ` — ${d.waiveReason}` : ''}`);
+  if (d.supersededBy) lines.push(`- **Superseded by:** ${d.supersededBy}`);
+  if (Array.isArray(d.log) && d.log.length) {
+    lines.push(`- **History:**`);
+    for (const e of d.log) lines.push(`  - ${dash(e.at)}: ${dash(e.from)} → ${e.to}${e.note ? ` — ${e.note}` : ''}`);
+  }
+  return lines.join('\n');
+}
+
+function gitStatusRefs(refs) {
+  if (!refs || !refs.isRepo) return '### Git status\n_not a git repository_';
+  const o = [];
+  o.push('### Git status (base-qualified)');
+  o.push(`- **Branch:** ${dash(refs.branch)} @ ${dash(refs.head)} — ${refs.dirty ? 'dirty' : 'clean'}`);
+  o.push(`- **Upstream:** ${refs.upstream || '— none set'}`);
+  if (refs.comparisons && refs.comparisons.length) {
+    for (const c of refs.comparisons) {
+      o.push(`- **vs \`${c.base}\`:** ${c.ahead} ahead, ${c.behind} behind`);
+    }
+  } else {
+    o.push('- _no comparison bases found (main/origin-main/upstream all absent)_');
+  }
+  o.push(`- **Unpushed (vs upstream):** ${refs.unpushed == null ? '— no upstream set' : refs.unpushed}`);
+  o.push(`- **A remote branch contains HEAD:** ${refs.remoteContainsHead ? 'yes' : 'no'}`);
+  o.push('');
+  o.push('_Every count names its base ref — never "ahead of main" without saying which main._');
+  return o.join('\n');
+}
+
 function repoSnapshot(snap) {
   const out = [];
   out.push(`### Repo snapshot — ${snap.root}`);
@@ -155,4 +205,4 @@ function fullExport(state, ledger) {
   return out.join('\n');
 }
 
-module.exports = { stateSummary, friction, confidence, repoSnapshot, fullExport, dash, bullets };
+module.exports = { stateSummary, friction, confidence, defectList, defectOne, gitStatusRefs, repoSnapshot, fullExport, dash, bullets };

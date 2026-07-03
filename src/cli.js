@@ -8,6 +8,8 @@ const ledger = require('./ledger');
 const scoring = require('./scoring');
 const artifacts = require('./artifacts');
 const repo = require('./repoSnapshot');
+const gitRefs = require('./gitRefs');
+const coldStart = require('./coldStart');
 const md = require('./markdown');
 const schemas = require('./schemas');
 
@@ -47,6 +49,43 @@ function coerceScalar(key, value) {
   if (key === 'dirty') return value === 'true' || value === true;
   if (key === 'confidence') return value === '' ? null : Number(value);
   return value;
+}
+
+// Minimal `--key value` parser for subcommands that carry real values (defect
+// lifecycle). The top-level router treats every `--flag` as boolean, which is
+// fine for switches like --json but drops values like --evidence "<text>".
+// Declared booleans never swallow the following positional.
+function parseArgv(argv, { booleans = [] } = {}) {
+  const boolSet = new Set(booleans);
+  const positionals = [];
+  const opts = {};
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i];
+    if (typeof a === 'string' && a.startsWith('--')) {
+      const eq = a.indexOf('=');
+      if (eq !== -1) {
+        opts[a.slice(2, eq)] = a.slice(eq + 1);
+        continue;
+      }
+      const key = a.slice(2);
+      const next = argv[i + 1];
+      if (!boolSet.has(key) && next != null && !String(next).startsWith('--')) {
+        opts[key] = next;
+        i++;
+      } else {
+        opts[key] = true;
+      }
+    } else {
+      positionals.push(a);
+    }
+  }
+  return { positionals, opts };
+}
+
+// A flag value is only usable if it is a non-empty string; a bare `--evidence`
+// (no value) parses as `true` and must be rejected, not stringified to "true".
+function strOpt(v) {
+  return v == null || v === true ? '' : String(v).trim();
 }
 
 // ---------------------------------------------------------------------------
@@ -95,11 +134,11 @@ function run(argv) {
       return out(`artifact ${rec.id} added: ${rec.title} (${rec.status})`);
     }
 
-    case 'defect': {
-      if (sub !== 'add') throw new Error('usage: ratchet defect add <json>');
-      const rec = artifacts.addDefect(cwd, readPayload(rest[0]));
-      return out(`defect ${rec.state.id} added: [${rec.state.severity}] ${rec.state.summary}`);
-    }
+    case 'defect':
+      return cmdDefect(cwd, args, asJson);
+
+    case 'retract':
+      return cmdRetract(cwd, args);
 
     case 'score':
       return cmdScore(cwd, sub, rest, asJson);
@@ -108,6 +147,14 @@ function run(argv) {
       const target = rest[0] || cwd;
       const snap = repo.snapshot(target);
       return out(asJson ? JSON.stringify(snap, null, 2) : md.repoSnapshot(snap));
+    }
+
+    case 'git': {
+      if (sub !== 'status-refs' && sub !== 'status') {
+        throw new Error('usage: ratchet git status-refs [--json]');
+      }
+      const refs = gitRefs.statusRefs(cwd);
+      return out(asJson ? JSON.stringify(refs, null, 2) : md.gitStatusRefs(refs));
     }
 
     case 'export':
@@ -124,6 +171,7 @@ function run(argv) {
     }
 
     case 'doctor':
+      if (sub === 'cold-start') return cmdColdStart(cwd, asJson);
       return cmdDoctor(cwd, asJson);
 
     case 'touch': {
@@ -217,6 +265,95 @@ function cmdLedger(cwd, sub, rest, asJson) {
     default:
       throw new Error(`unknown ledger subcommand: ${sub}`);
   }
+}
+
+// Defect lifecycle — the mutation the CLI lacked in 0.2. `add` keeps its JSON
+// contract; every other verb transitions an existing defect by id and (for the
+// clearing verbs) demands the proof/reason that makes the clear honest.
+function cmdDefect(cwd, argv, asJson) {
+  // argv still includes the leading "defect" group token → positionals[0].
+  const { positionals, opts } = parseArgv(argv, { booleans: ['json'] });
+  const sub = positionals[1];
+  const id = positionals[2];
+  const json = asJson || opts.json === true;
+
+  const need = (val, msg) => {
+    if (!val) throw new Error(msg);
+    return val;
+  };
+
+  switch (sub) {
+    case 'add': {
+      const rec = artifacts.addDefect(cwd, readPayload(positionals[2]));
+      return out(`defect ${rec.state.id} added: [${rec.state.severity}] ${rec.state.summary}`);
+    }
+    case 'list': {
+      const s = state.loadState(cwd);
+      return out(json ? JSON.stringify(s.defects || [], null, 2) : md.defectList(s.defects || []));
+    }
+    case 'get': {
+      need(id, 'usage: ratchet defect get <id> [--json]');
+      const s = state.loadState(cwd);
+      const d = (s.defects || []).find((x) => x.id === id);
+      if (!d) throw new Error(`no defect with id "${id}"`);
+      return out(json ? JSON.stringify(d, null, 2) : md.defectOne(d));
+    }
+    case 'resolve': {
+      need(id, 'usage: ratchet defect resolve <id> --evidence "<proof>"');
+      const evidence = strOpt(opts.evidence);
+      // Proof gate, same spirit as the evolve KEEP gate: a defect cannot be
+      // marked fixed without stating the proof that it is actually fixed.
+      need(evidence, 'defect resolve requires --evidence "<proof it is actually fixed>" — no proof, no resolve');
+      artifacts.transitionDefect(cwd, id, 'resolved', { evidence, note: `resolved: ${evidence}` });
+      return out(`defect ${id} → resolved`);
+    }
+    case 'reopen': {
+      need(id, 'usage: ratchet defect reopen <id> --reason "<why>"');
+      const reason = strOpt(opts.reason);
+      need(reason, 'defect reopen requires --reason "<why it is not actually fixed>"');
+      artifacts.transitionDefect(cwd, id, 'reopened', { reason, note: `reopened: ${reason}` });
+      return out(`defect ${id} → reopened`);
+    }
+    case 'waive': {
+      need(id, 'usage: ratchet defect waive <id> --owner "<name>" --reason "<why>"');
+      const owner = strOpt(opts.owner);
+      const reason = strOpt(opts.reason);
+      need(owner, 'defect waive requires --owner "<who accepts the risk>"');
+      need(reason, 'defect waive requires --reason "<why shipping anyway is acceptable>"');
+      artifacts.transitionDefect(cwd, id, 'waived', { owner, reason, note: `waived by ${owner}: ${reason}` });
+      return out(`defect ${id} → waived (owner: ${owner})`);
+    }
+    case 'supersede': {
+      need(id, 'usage: ratchet defect supersede <id> --by <artifact-or-defect-id>');
+      const by = strOpt(opts.by);
+      need(by, 'defect supersede requires --by <artifact-or-defect-id>');
+      const reason = strOpt(opts.reason);
+      artifacts.transitionDefect(cwd, id, 'superseded', {
+        by,
+        reason,
+        note: `superseded by ${by}${reason ? `: ${reason}` : ''}`,
+      });
+      return out(`defect ${id} → superseded (by: ${by})`);
+    }
+    default:
+      throw new Error(
+        'usage: ratchet defect <add|list|get|resolve|reopen|waive|supersede> ...' + (sub ? ` (got "${sub}")` : '')
+      );
+  }
+}
+
+// Retract an artifact whose central claim became false or obsolete. Requires a
+// reason (proof-gate spirit: never retract silently); --superseded-by links the
+// replacement so provenance survives.
+function cmdRetract(cwd, argv) {
+  const { positionals, opts } = parseArgv(argv, {});
+  const id = positionals[1];
+  if (!id) throw new Error('usage: ratchet retract <artifact-id> --reason "<why>" [--superseded-by <id>]');
+  const reason = strOpt(opts.reason);
+  if (!reason) throw new Error("retract requires --reason \"<why this artifact's claim is false or obsolete>\"");
+  const supersededBy = strOpt(opts['superseded-by']);
+  artifacts.retractArtifact(cwd, id, { reason, supersededBy });
+  return out(`artifact ${id} retracted${supersededBy ? ` (superseded by ${supersededBy})` : ''}`);
 }
 
 function cmdScore(cwd, sub, rest, asJson) {
@@ -437,6 +574,31 @@ function cmdDoctor(cwd, asJson) {
   if (failed.length) process.exitCode = 1;
 }
 
+// Cold-start poison scan: does the current state / operator surfaces steer the
+// next session into the wrong world? Generic ratchet-state checks always run;
+// project surfaces are opt-in via .ratchet/cold-start.json. FAIL = contradiction.
+function cmdColdStart(cwd, asJson) {
+  const result = coldStart.scan(cwd);
+  if (asJson) {
+    out(JSON.stringify(result, null, 2));
+  } else {
+    out('ratchet doctor cold-start');
+    out('');
+    for (const c of result.checks) {
+      const tag = c.level === 'ok' ? 'ok  ' : c.level === 'warn' ? 'warn' : 'FAIL';
+      out(`  ${tag} ${c.name}${c.detail ? ` — ${c.detail}` : ''}`);
+    }
+    out('');
+    const fails = result.checks.filter((c) => c.level === 'fail').length;
+    const warns = result.checks.filter((c) => c.level === 'warn').length;
+    if (fails) out(`${fails} contradiction(s), ${warns} warning(s) — cold-start surfaces may steer the next session wrong.`);
+    else if (warns) out(`no contradictions, ${warns} warning(s).`);
+    else out('clean — no stale steering detected.');
+    if (!result.configured) out('(generic checks only — add .ratchet/cold-start.json to scan project surfaces)');
+  }
+  if (!result.ok) process.exitCode = 1;
+}
+
 function help() {
   out(
     [
@@ -454,6 +616,13 @@ function help() {
       'ARTIFACTS & DEFECTS',
       '  ratchet artifact add <json>        record an artifact ({title,kind,status,path,holes})',
       '  ratchet defect add <json>          record a defect ({severity,summary,feature}) — also hits ledger',
+      '  ratchet defect list [--json]       list defects (○ draining / ● terminal)',
+      '  ratchet defect get <id> [--json]   show one defect + its lifecycle log',
+      '  ratchet defect resolve <id> --evidence "<proof>"            mark fixed (proof required)',
+      '  ratchet defect reopen <id> --reason "<why>"                 a resolved defect regressed',
+      '  ratchet defect waive <id> --owner "<name>" --reason "<why>" accept the risk, stop the drain',
+      '  ratchet defect supersede <id> --by <artifact-id>            replaced by newer work',
+      '  ratchet retract <id> --reason "<why>" [--superseded-by <id>] retract a false/obsolete artifact',
       '',
       'LEDGER (QA canonical record)',
       '  ratchet ledger create              ensure ledger exists',
@@ -466,11 +635,13 @@ function help() {
       '',
       'CONTEXT',
       '  ratchet snapshot repo [path]       cheap repo read (files, dirs, git)',
+      '  ratchet git status-refs [--json]   ahead/behind vs every base ref, each named',
       '  ratchet export markdown            full session compile',
       '  ratchet export json                raw state',
       '',
       'PLUGIN HEALTH',
       '  ratchet doctor [--json]            check plugin shape, version alignment, state dir',
+      '  ratchet doctor cold-start [--json] scan for stale steering (opt-in surfaces via .ratchet/cold-start.json)',
       '',
       'json args accept a raw string, @file, or - for stdin.',
     ].join('\n')

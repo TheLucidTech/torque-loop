@@ -18,7 +18,23 @@ const PRESSURES = [
 ];
 
 const MODES = ['code', 'prompt', 'docs', 'workflow', 'auto'];
-const VERDICTS = ['KEEP', 'REVERT', 'ASK'];
+// REVERTED_AND_LEARNED is a *successful* outcome: a mutation was reverted after
+// verification and a reusable lesson/test remained. Like REVERT it never claims
+// a kept improvement, so it bypasses the KEEP proof gate.
+const VERDICTS = ['KEEP', 'REVERT', 'ASK', 'REVERTED_AND_LEARNED'];
+
+// Seam fidelity (0.3). How close the tested seam is to the seam the artifact
+// actually ships on, and what kind of evidence produced the claim.
+const SEAM_MATCHES = ['exact', 'close-proxy', 'weak-proxy', 'mismatch'];
+const EVIDENCE_TYPES = ['test', 'manual', 'code-read', 'live-call', 'static-analysis', 'eval', 're-run'];
+
+// A human waiver is only valid if it names who accepts the risk and why.
+function normalizeWaiver(w) {
+  if (!w || typeof w !== 'object') return null;
+  const by = w.by || w.owner || '';
+  const reason = w.reason || '';
+  return by && reason ? { by, reason } : null;
+}
 
 function nowIso() {
   if (process.env.RATCHET_NOW) return process.env.RATCHET_NOW;
@@ -32,6 +48,7 @@ function newEvent(f = {}) {
     target: f.target || '',
     goal: f.goal || '',
     iteration: f.iteration != null ? f.iteration : 1,
+    mode: MODES.includes(f.mode) ? f.mode : '',
     pressure: {
       primary: f.pressure?.primary || (f.primary || ''),
       secondary: f.pressure?.secondary || (f.secondary || ''),
@@ -42,6 +59,18 @@ function newEvent(f = {}) {
       commands: f.verification?.commands || [],
       manualChecks: f.verification?.manualChecks || [],
       result: f.verification?.result || 'manual', // pass | fail | manual
+    },
+    // Seam-fidelity metadata: what was tested, how, and whether that seam is the
+    // one the artifact actually ships on. The KEEP gate reads this for code.
+    seam: {
+      evidenceType: f.seam?.evidenceType || f.evidenceType || '',
+      method: f.seam?.method || f.method || '',
+      independentFromBuilderMethod: f.seam?.independentFromBuilderMethod ?? f.independentFromBuilderMethod ?? null,
+      testedSeam: f.seam?.testedSeam || f.testedSeam || '',
+      shipSeam: f.seam?.shipSeam || f.shipSeam || '',
+      seamMatch: SEAM_MATCHES.includes(f.seam?.seamMatch || f.seamMatch) ? f.seam?.seamMatch || f.seamMatch : '',
+      proxyWarning: f.seam?.proxyWarning ?? f.proxyWarning ?? null,
+      waiver: normalizeWaiver(f.seam?.waiver || f.waiver),
     },
     verdict: VERDICTS.includes(f.verdict) ? f.verdict : 'ASK',
     remainingRisks: Array.isArray(f.remainingRisks) ? f.remainingRisks : [],
@@ -70,7 +99,31 @@ function validateKeepGate(event) {
   if (result === 'manual' && !manualChecks.length) {
     throw new Error('cannot KEEP: manual verification requires explicit checks');
   }
+
+  // Seam gate (0.3 — "wrong proof → no ship"). Production code cannot be KEPT on
+  // evidence from a different seam than the one it ships on: a proxy eval can
+  // show the right-looking number and still point at the wrong decision. Require
+  // an exact ship-seam match (or an explicit, named human waiver). Non-code
+  // artifacts (docs/prompt/workflow) keep the lighter manual-evidence contract.
+  if (event.mode === 'code') {
+    const seam = event.seam || {};
+    const waived = Boolean(seam.waiver && seam.waiver.by && seam.waiver.reason);
+    if (!waived) {
+      if (seam.seamMatch !== 'exact') {
+        throw new Error(
+          `cannot KEEP production code: evidence seam is "${seam.seamMatch || 'unspecified'}", not "exact" — ` +
+            'test the ship seam, or waive with a named owner + reason (wrong proof → no ship)'
+        );
+      }
+      if (seam.independentFromBuilderMethod === false) {
+        throw new Error(
+          "cannot KEEP production code: verification repeated the builder's own method, so it is not " +
+            'independent — vary the method, or waive with a named owner + reason'
+        );
+      }
+    }
+  }
   return event;
 }
 
-module.exports = { PRESSURES, MODES, VERDICTS, nowIso, newEvent, validateKeepGate };
+module.exports = { PRESSURES, MODES, VERDICTS, SEAM_MATCHES, EVIDENCE_TYPES, nowIso, newEvent, validateKeepGate };

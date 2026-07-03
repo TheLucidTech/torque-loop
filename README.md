@@ -255,6 +255,41 @@ refused at write time — the loop cannot record progress it did not prove.
 
 ---
 
+## Why seam fidelity matters
+
+Torque Loop does not only ask *"was this tested?"* It asks *"was this tested at the seam
+you are about to ship?"* A proxy evaluation can produce the right-looking number and still
+point at the wrong decision.
+
+In one real session, a proposed replay-only recall-router gate looked like a **+21.4%**
+improvement in a fixture-shortlist eval (`apply_strategy` over a force-included lexical
+shortlist). A live-seam eval against the actual ship path (`rerank_candidates` over cosine
+recall, with no forced gold) showed the opposite: the gate was a **regression**. The flag
+was reverted, **no code shipped**, and the router stayed as-is.
+
+That is a successful loop — the outcome Torque Loop now records as `REVERTED_AND_LEARNED`.
+
+> **No proof → no keep.** (v0.2 — the proof gate)
+> **Wrong proof → no ship.** (v0.3 — the seam gate)
+
+The seam gate is why a production-code `KEEP` in `/ratchet:evolve` must declare an exact
+ship-seam match (or a named human waiver), and why verification that merely repeats the
+builder's own search method is rejected as not independent.
+
+### v0.3 state & quality verbs (`ratchet` CLI)
+
+| Command | Purpose |
+| --- | --- |
+| `ratchet defect resolve <id> --evidence "<proof>"` | Clear a defect — proof required. |
+| `ratchet defect waive <id> --owner <name> --reason "<why>"` | Accept the risk; stop the confidence drain. |
+| `ratchet defect supersede <id> --by <artifact-id>` | Replace a defect with newer work. |
+| `ratchet defect reopen <id> --reason "<why>"` | A resolved defect regressed. |
+| `ratchet retract <id> --reason "<why>" [--superseded-by <id>]` | Retract a false/obsolete artifact (provenance kept). |
+| `ratchet git status-refs` | Ahead/behind vs every base ref — each one named. |
+| `ratchet doctor cold-start` | Scan for stale steering (opt-in surfaces via `.ratchet/cold-start.json`). |
+
+---
+
 ## How it works
 
 ```

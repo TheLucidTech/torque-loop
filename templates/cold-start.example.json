@@ -1,0 +1,20 @@
+{
+  "_comment": "Copy to .ratchet/cold-start.json to add project-specific cold-start surface checks. The generic ratchet-state checks always run without this file; this only adds an OPT-IN adapter for your own operator surfaces. Torque Loop ships no built-in knowledge of any specific workspace — the .lucid/goal entry below is an EXAMPLE, not default behavior.",
+  "surfaces": [
+    {
+      "path": ".lucid/goal",
+      "kind": "goal",
+      "checks": ["base-qualified-git", "valid-as-of", "no-retracted-claims"]
+    },
+    {
+      "path": "../local-loop/DECISION_SHEET.md",
+      "kind": "decision-sheet",
+      "checks": ["valid-as-of", "base-qualified-git", "no-retracted-claims"]
+    },
+    {
+      "glob": "reports/**/*.md",
+      "kind": "artifact",
+      "checks": ["retracted-title", "supersession-link"]
+    }
+  ]
+}

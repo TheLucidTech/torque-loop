@@ -84,6 +84,12 @@ const LEDGER_COLLECTIONS = {
 const SEVERITIES = ['critical', 'high', 'medium', 'low', 'info'];
 const PHASES = ['idle', 'lock', 'auction', 'cut', 'build', 'attack', 'patch', 'compile', 'loop'];
 
+// Defect lifecycle. `open`/`patched`/`reopened` are still-live pressure and
+// drain confidence; the TERMINAL set does not. `closed` is the pre-0.3 alias
+// for `resolved`. A defect only leaves the terminal set by being reopened.
+const DEFECT_STATUSES = ['open', 'patched', 'reopened', 'resolved', 'waived', 'superseded', 'closed'];
+const DEFECT_TERMINAL_STATUSES = ['resolved', 'closed', 'waived', 'superseded'];
+
 module.exports = {
   STATE_VERSION,
   LEDGER_VERSION,
@@ -95,4 +101,6 @@ module.exports = {
   LEDGER_COLLECTIONS,
   SEVERITIES,
   PHASES,
+  DEFECT_STATUSES,
+  DEFECT_TERMINAL_STATUSES,
 };

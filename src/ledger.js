@@ -2,6 +2,7 @@
 
 const state = require('./state');
 const schemas = require('./schemas');
+const scoring = require('./scoring');
 
 // The QA ledger is the canonical feature/test/defect record for a repo.
 // It is separate from session state: state is "this session"; the ledger is
@@ -37,7 +38,7 @@ function upsert(cwd, collection, item) {
 }
 
 function summary(ledger) {
-  const openDefects = (ledger.defects || []).filter((d) => d.status !== 'resolved' && d.status !== 'closed');
+  const openDefects = (ledger.defects || []).filter(scoring.isDefectOpen);
   const failingTests = (ledger.tests || []).filter((t) => t.status === 'fail');
   return {
     features: (ledger.features || []).length,
