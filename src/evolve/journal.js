@@ -60,13 +60,16 @@ function appendEvent(cwd, fields) {
 
 function status(cwd = process.cwd()) {
   const events = readEvents(cwd);
-  if (!events.length) return { events: 0, kept: 0, reverted: 0, asks: 0, targets: [], last: null };
+  if (!events.length) {
+    return { events: 0, kept: 0, reverted: 0, revertedAndLearned: 0, asks: 0, targets: [], last: null };
+  }
   const targets = [...new Set(events.map((e) => e.target))];
   const last = events[events.length - 1];
   const kept = events.filter((e) => e.verdict === 'KEEP').length;
   const reverted = events.filter((e) => e.verdict === 'REVERT').length;
+  const revertedAndLearned = events.filter((e) => e.verdict === 'REVERTED_AND_LEARNED').length;
   const asks = events.filter((e) => e.verdict === 'ASK').length;
-  return { events: events.length, kept, reverted, asks, targets, last };
+  return { events: events.length, kept, reverted, revertedAndLearned, asks, targets, last };
 }
 
 module.exports = { logPath, readEvents, appendEvent, nextId, status };

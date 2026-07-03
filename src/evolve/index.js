@@ -105,11 +105,17 @@ function renderStatus(s) {
   o.push(`- Events: ${s.events}`);
   o.push(`- Kept: ${s.kept}`);
   o.push(`- Reverted: ${s.reverted}`);
+  if (s.revertedAndLearned) {
+    o.push(`- Reverted & learned: ${s.revertedAndLearned} (successful loop — corrected knowledge, no bad code kept)`);
+  }
   o.push(`- Asks: ${s.asks}`);
   o.push('- Active targets:');
   for (const t of s.targets) o.push(`  - ${t}`);
   if (s.last) {
     o.push(`- Last verdict: ${s.last.verdict} (${s.last.id})`);
+    if (s.last.seam && s.last.seam.seamMatch) {
+      o.push(`- Last seam match: ${s.last.seam.seamMatch}${s.last.seam.shipSeam ? ` (ship seam: ${s.last.seam.shipSeam})` : ''}`);
+    }
     if (s.last.nextEdge) o.push(`- Next edge: ${s.last.nextEdge}`);
   }
   return o.join('\n');
@@ -216,6 +222,7 @@ function help() {
       '  ratchet-evolve score mutation <json>                     rank candidates, pick one (--json)',
       '  ratchet-evolve verify <target> [--test "cmd"] [--mode m] gather verification evidence (--json)',
       '  ratchet-evolve log append <json>                         write an evolution event (KEEP needs proof)',
+      '      code KEEP also needs seam:{seamMatch:"exact",...} or seam.waiver:{by,reason} — wrong proof → no ship',
       '  ratchet-evolve log | status                              read the evolve log (--json)',
       '  ratchet-evolve next                                      show the last recorded next edge (--json)',
       '  ratchet-evolve pressure [mode]                           suggested pressure vector for a mode',

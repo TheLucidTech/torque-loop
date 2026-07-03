@@ -18,6 +18,8 @@ const artifacts = require('../src/artifacts');
 const ledger = require('../src/ledger');
 const md = require('../src/markdown');
 const repo = require('../src/repoSnapshot');
+const gitRefs = require('../src/gitRefs');
+const coldStart = require('../src/coldStart');
 const cli = require('../src/cli');
 
 let passed = 0;
@@ -53,6 +55,96 @@ ok('defect add hits both state and ledger', () => {
   assert.strictEqual(res.state.severity, 'high');
   assert.ok(res.ledger, 'ledger record created');
   assert.strictEqual(ledger.summary(state.loadLedger(cwd)).openDefects, 1);
+});
+
+// --- defect lifecycle (0.3 Seam Gate) ---------------------------------------
+
+ok('defect resolve requires evidence (proof gate)', () => {
+  const { state: d } = artifacts.addDefect(cwd, { severity: 'high', summary: 'needs proof' });
+  assert.throws(() => cli.run(['node', 'ratchet', 'defect', 'resolve', d.id]), /evidence/);
+  assert.strictEqual(state.loadState(cwd).defects.find((x) => x.id === d.id).status, 'open', 'stays open without proof');
+});
+
+ok('defect resolve with evidence clears the confidence drain', () => {
+  const { state: d } = artifacts.addDefect(cwd, { severity: 'critical', summary: 'blocker' });
+  const before = scoring.scoreConfidence(state.loadState(cwd)).score;
+  cli.run(['node', 'ratchet', 'defect', 'resolve', d.id, '--evidence', 'ran the repro, now green']);
+  const after = state.loadState(cwd).defects.find((x) => x.id === d.id);
+  assert.strictEqual(after.status, 'resolved');
+  assert.ok(/green/.test(after.evidence), 'resolution evidence is recorded');
+  assert.ok(scoring.scoreConfidence(state.loadState(cwd)).score > before, 'resolving raises confidence');
+});
+
+ok('defect waive stops the drain (the case the 0.2 scorer was blind to)', () => {
+  const { state: d } = artifacts.addDefect(cwd, { severity: 'critical', summary: 'accepted risk' });
+  const before = scoring.scoreConfidence(state.loadState(cwd)).score;
+  cli.run(['node', 'ratchet', 'defect', 'waive', d.id, '--owner', 'danny', '--reason', 'out of scope this release']);
+  const after = state.loadState(cwd).defects.find((x) => x.id === d.id);
+  assert.strictEqual(after.status, 'waived');
+  assert.strictEqual(after.waivedBy, 'danny');
+  assert.ok(scoring.scoreConfidence(state.loadState(cwd)).score > before, 'waiving stops the drain');
+});
+
+ok('defect waive requires both owner and reason', () => {
+  const { state: d } = artifacts.addDefect(cwd, { severity: 'low', summary: 'nit' });
+  assert.throws(() => cli.run(['node', 'ratchet', 'defect', 'waive', d.id, '--reason', 'x']), /owner/);
+  assert.throws(() => cli.run(['node', 'ratchet', 'defect', 'waive', d.id, '--owner', 'danny']), /reason/);
+});
+
+ok('defect supersede stops the drain and records the replacement', () => {
+  const { state: d } = artifacts.addDefect(cwd, { severity: 'high', summary: 'old premise' });
+  const before = scoring.scoreConfidence(state.loadState(cwd)).score;
+  cli.run(['node', 'ratchet', 'defect', 'supersede', d.id, '--by', 'art_live_seam_eval']);
+  const after = state.loadState(cwd).defects.find((x) => x.id === d.id);
+  assert.strictEqual(after.status, 'superseded');
+  assert.strictEqual(after.supersededBy, 'art_live_seam_eval');
+  assert.ok(scoring.scoreConfidence(state.loadState(cwd)).score > before);
+});
+
+ok('defect reopen re-drains a resolved defect', () => {
+  const { state: d } = artifacts.addDefect(cwd, { severity: 'high', summary: 'flaky' });
+  cli.run(['node', 'ratchet', 'defect', 'resolve', d.id, '--evidence', 'passed 100x']);
+  const mid = scoring.scoreConfidence(state.loadState(cwd)).score;
+  cli.run(['node', 'ratchet', 'defect', 'reopen', d.id, '--reason', 'regressed on CI']);
+  assert.strictEqual(state.loadState(cwd).defects.find((x) => x.id === d.id).status, 'reopened');
+  assert.ok(scoring.scoreConfidence(state.loadState(cwd)).score < mid, 'reopen re-drains confidence');
+});
+
+ok('resolving a defect syncs its ledger mirror', () => {
+  const { state: d } = artifacts.addDefect(cwd, { severity: 'high', summary: 'mirror me', feature: 'router' });
+  assert.ok(d.ledgerId, 'state defect links to its ledger mirror');
+  cli.run(['node', 'ratchet', 'defect', 'resolve', d.id, '--evidence', 'fixed + verified live']);
+  const mirror = state.loadLedger(cwd).defects.find((x) => x.id === d.ledgerId);
+  assert.strictEqual(mirror.status, 'resolved', 'ledger mirror follows the state transition');
+});
+
+ok('defect list + get render without throwing', () => {
+  const listOut = md.defectList(state.loadState(cwd).defects);
+  assert.ok(/Defects/.test(listOut));
+  const one = state.loadState(cwd).defects[0];
+  assert.ok(md.defectOne(one).includes(one.id));
+});
+
+// --- artifact retraction (0.3 Seam Gate) ------------------------------------
+
+ok('retract flips status, keeps provenance, and stops holes draining confidence', () => {
+  const a = artifacts.addArtifact(cwd, { title: 'T2.3 re-scope', kind: 'docs', holes: ['premise unverified'] });
+  const before = scoring.scoreConfidence(state.loadState(cwd)).score;
+  cli.run([
+    'node', 'ratchet', 'retract', a.id,
+    '--reason', 'central premise false: endpoint exists and returns live vectors',
+    '--superseded-by', 'art_live_seam_eval',
+  ]);
+  const after = state.loadState(cwd).artifacts.find((x) => x.id === a.id);
+  assert.strictEqual(after.status, 'retracted');
+  assert.strictEqual(after.retracted.keptForProvenance, true);
+  assert.strictEqual(after.retracted.supersededBy, 'art_live_seam_eval');
+  assert.ok(scoring.scoreConfidence(state.loadState(cwd)).score >= before, 'a retracted holey artifact stops draining');
+});
+
+ok('retract requires a reason (no silent retraction)', () => {
+  const a = artifacts.addArtifact(cwd, { title: 'x', kind: 'docs' });
+  assert.throws(() => cli.run(['node', 'ratchet', 'retract', a.id]), /reason/);
 });
 
 ok('friction uses 1-10 scale and ranks', () => {
@@ -150,6 +242,72 @@ ok('repo snapshot sees allowlisted dot dirs, skips .git / node_modules', () => {
   assert.ok(snap.dirs.includes('.github'), '.github is visible');
   assert.ok(!snap.dirs.includes('.git'), '.git is skipped');
   assert.ok(!snap.dirs.includes('node_modules'), 'node_modules is skipped');
+});
+
+ok('git status-refs is base-qualified and never emits a bare count', () => {
+  const refs = gitRefs.statusRefs(process.cwd());
+  assert.strictEqual(typeof refs.isRepo, 'boolean');
+  if (refs.isRepo) {
+    assert.ok(Array.isArray(refs.comparisons), 'comparisons is an array');
+    for (const c of refs.comparisons) {
+      assert.ok(c.base, 'every comparison names its base ref');
+      assert.strictEqual(typeof c.ahead, 'number');
+      assert.strictEqual(typeof c.behind, 'number');
+    }
+  }
+  const rendered = md.gitStatusRefs(refs);
+  assert.ok(/Git status/.test(rendered));
+  // A non-repo path renders cleanly, not a crash.
+  assert.ok(/not a git repository/.test(md.gitStatusRefs({ isRepo: false })));
+});
+
+ok('cold-start scanner flags retracted steering + unqualified git counts', () => {
+  const proj = path.join(tmp, 'cold-fixture');
+  fs.mkdirSync(path.join(proj, '.ratchet'), { recursive: true });
+  state.initProject(proj, { force: true });
+  const st = state.loadState(proj);
+  st.objective = 'ship seam gate';
+  st.nextAction = 'finish art-dead re-scope';
+  st.artifacts = [
+    { id: 'art-dead', title: 'T2.3 re-scope', status: 'retracted', path: 'reports/rescope.md', retracted: { supersededBy: 'art-eval', keptForProvenance: true } },
+  ];
+  state.saveState(proj, st);
+  // a goal surface: unqualified git count, no valid-as-of stamp, repeats the retracted claim
+  fs.writeFileSync(path.join(proj, 'goal.md'), '# Goal\nWe are 43 ahead of main.\nT2.3 re-scope is still the plan.\n');
+  fs.writeFileSync(
+    path.join(proj, '.ratchet', 'cold-start.json'),
+    JSON.stringify({ surfaces: [{ path: 'goal.md', kind: 'goal', checks: ['base-qualified-git', 'valid-as-of', 'no-retracted-claims'] }] })
+  );
+  const r = coldStart.scan(proj);
+  assert.strictEqual(r.ok, false, 'contradictions make the scan not-ok');
+  const lvl = (frag) => (r.checks.find((c) => c.name.includes(frag)) || {}).level;
+  assert.strictEqual(lvl('steering artifact is live'), 'fail');
+  assert.strictEqual(lvl('next action avoids retracted'), 'fail');
+  assert.strictEqual(lvl('base-qualified-git'), 'fail');
+  assert.strictEqual(lvl('valid-as-of'), 'warn');
+  assert.strictEqual(lvl('no-retracted-claims'), 'fail');
+});
+
+ok('cold-start scanner is clean on healthy state and flags unimplemented checks transparently', () => {
+  const proj = path.join(tmp, 'cold-clean');
+  fs.mkdirSync(path.join(proj, '.ratchet'), { recursive: true });
+  state.initProject(proj, { force: true });
+  const st = state.loadState(proj);
+  st.objective = 'x';
+  st.nextAction = 'do y';
+  st.artifacts = [{ id: 'a1', title: 'live spec', status: 'v1', holes: [] }];
+  state.saveState(proj, st);
+  fs.writeFileSync(path.join(proj, 'sheet.md'), '# Sheet\nvalid-as-of 2026-07-03\n82 ahead of origin/main.\n');
+  fs.writeFileSync(
+    path.join(proj, '.ratchet', 'cold-start.json'),
+    JSON.stringify({ surfaces: [{ path: 'sheet.md', kind: 'decision-sheet', checks: ['valid-as-of', 'base-qualified-git', 'no-closed-work-as-next'] }] })
+  );
+  const r = coldStart.scan(proj);
+  assert.strictEqual(r.ok, true, 'healthy state + qualified counts pass');
+  assert.strictEqual((r.checks.find((c) => c.name.includes('valid-as-of')) || {}).level, 'ok');
+  assert.strictEqual((r.checks.find((c) => c.name.includes('base-qualified-git')) || {}).level, 'ok');
+  // a declared-but-unimplemented check must warn, not silently pass
+  assert.strictEqual((r.checks.find((c) => c.name.includes('no-closed-work-as-next')) || {}).level, 'warn');
 });
 
 fs.rmSync(tmp, { recursive: true, force: true });

@@ -127,6 +127,77 @@ ok('proof gate: KEEP is rejected without proof', () => {
   );
 });
 
+ok('seam gate: production KEEP needs an exact ship-seam match', () => {
+  const keepCode = (over) =>
+    schema.newEvent({
+      target: 'src/router.js',
+      mode: 'code',
+      verdict: 'KEEP',
+      verification: { commands: [{ pass: true }], result: 'pass' },
+      ...over,
+    });
+  // The T2.3 case: a proxy eval that looked good but measured the wrong seam.
+  assert.throws(() => schema.validateKeepGate(keepCode({ seam: { seamMatch: 'weak-proxy' } })), /seam/i);
+  // No seam declared at all → cannot ship.
+  assert.throws(() => schema.validateKeepGate(keepCode({})), /seam/i);
+  // Exact ship-seam match, independent method → allowed.
+  schema.validateKeepGate(keepCode({ seam: { seamMatch: 'exact', independentFromBuilderMethod: true } }));
+});
+
+ok('seam gate: verification that repeats the builder method is not independent', () => {
+  const ev = schema.newEvent({
+    target: 'src/router.js',
+    mode: 'code',
+    verdict: 'KEEP',
+    verification: { commands: [{ pass: true }], result: 'pass' },
+    seam: { seamMatch: 'exact', independentFromBuilderMethod: false },
+  });
+  assert.throws(() => schema.validateKeepGate(ev), /independent/i);
+});
+
+ok('seam gate: a named human waiver overrides a proxy seam', () => {
+  const ev = schema.newEvent({
+    target: 'src/router.js',
+    mode: 'code',
+    verdict: 'KEEP',
+    verification: { commands: [{ pass: true }], result: 'pass' },
+    seam: { seamMatch: 'mismatch', waiver: { by: 'danny', reason: 'hotfix; seam eval to follow' } },
+  });
+  schema.validateKeepGate(ev); // does not throw
+});
+
+ok('seam gate: docs/prompt KEEP stays exempt (manual evidence is enough)', () => {
+  schema.validateKeepGate(
+    schema.newEvent({
+      target: 'README.md',
+      mode: 'docs',
+      verdict: 'KEEP',
+      verification: { manualChecks: ['first-use path is unambiguous'], result: 'manual' },
+    })
+  );
+});
+
+ok('seam fields round-trip through newEvent', () => {
+  const e = schema.newEvent({
+    target: 'src/x.js',
+    mode: 'code',
+    verdict: 'ASK',
+    seam: {
+      evidenceType: 'live-call',
+      method: 'recursive grep + live endpoint call',
+      independentFromBuilderMethod: true,
+      testedSeam: 'rerank_candidates',
+      shipSeam: 'rerank_candidates',
+      seamMatch: 'exact',
+      proxyWarning: null,
+    },
+  });
+  assert.strictEqual(e.seam.seamMatch, 'exact');
+  assert.strictEqual(e.seam.testedSeam, 'rerank_candidates');
+  assert.strictEqual(e.seam.evidenceType, 'live-call');
+  assert.strictEqual(e.mode, 'code');
+});
+
 ok('proof gate: REVERT and ASK bypass the gate', () => {
   schema.validateKeepGate(schema.newEvent({ target: 't', verdict: 'REVERT', verification: { result: 'fail' } }));
   schema.validateKeepGate(schema.newEvent({ target: 't', verdict: 'ASK' }));
@@ -136,6 +207,21 @@ ok('proof gate: appendEvent refuses to persist an unproven KEEP', () => {
   assert.throws(() => journal.appendEvent(process.cwd(), { target: 'b.md', verdict: 'KEEP' }), /cannot KEEP/);
   const s = journal.status(process.cwd());
   assert.ok(!s.targets.includes('b.md'), 'the rejected KEEP was never written');
+});
+
+ok('REVERTED_AND_LEARNED is a successful outcome that bypasses the KEEP gate', () => {
+  // Reverting a mutation after verification (even a failing one) is valid and gate-exempt.
+  schema.validateKeepGate(
+    schema.newEvent({ target: 'src/router.js', mode: 'code', verdict: 'REVERTED_AND_LEARNED', verification: { result: 'fail' } })
+  );
+  journal.appendEvent(process.cwd(), {
+    target: 'src/router.js',
+    verdict: 'REVERTED_AND_LEARNED',
+    nextEdge: 'ship the live-seam eval harness, not the flag',
+  });
+  const s = journal.status(process.cwd());
+  assert.ok(s.revertedAndLearned >= 1, 'counted as a reverted-and-learned outcome');
+  assert.strictEqual(s.last.verdict, 'REVERTED_AND_LEARNED');
 });
 
 ok('pressure suggests a vector and flags the rewrite trap', () => {

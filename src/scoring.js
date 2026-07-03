@@ -3,6 +3,19 @@
 // Scoring is deliberately transparent: the model can reproduce it by hand.
 // No hidden weighting, no ML — just multiplicative pressure functions.
 
+const schemas = require('./schemas');
+
+// One predicate, one source of truth. Confidence, the state summary, and the
+// QA ledger all decide "is this defect still draining?" the same way — so a
+// resolved/waived/superseded defect can never lie on one surface while it drains
+// on another. Terminal statuses are read from schemas so the lifecycle verbs
+// and the scorer can never disagree about what "done" means.
+const TERMINAL_DEFECT_STATUSES = new Set(schemas.DEFECT_TERMINAL_STATUSES.map((s) => s.toLowerCase()));
+function isDefectOpen(defect) {
+  const status = String((defect && defect.status) || 'open').toLowerCase();
+  return !TERMINAL_DEFECT_STATUSES.has(status);
+}
+
 function clamp(n, lo, hi) {
   n = Number(n);
   if (Number.isNaN(n)) return lo;
@@ -59,7 +72,7 @@ function scoreFriction(obstacles) {
 
 function scoreConfidence(state) {
   const penalties = [];
-  const openDefects = (state.defects || []).filter((d) => d.status !== 'resolved' && d.status !== 'closed');
+  const openDefects = (state.defects || []).filter(isDefectOpen);
   const bySev = (sev) => openDefects.filter((d) => (d.severity || 'medium').toLowerCase() === sev);
 
   const critical = bySev('critical');
@@ -75,7 +88,9 @@ function scoreConfidence(state) {
   const untested = (state.assumptions || []).filter((a) => a.status !== 'tested' && a.status !== 'killed');
   if (untested.length) penalties.push({ reason: `${untested.length} untested assumption(s)`, cost: 10 * untested.length });
 
-  const holey = (state.artifacts || []).filter((a) => Array.isArray(a.holes) && a.holes.length > 0);
+  const holey = (state.artifacts || []).filter(
+    (a) => a.status !== 'retracted' && Array.isArray(a.holes) && a.holes.length > 0
+  );
   if (holey.length) penalties.push({ reason: `${holey.length} artifact(s) with known holes`, cost: 6 * holey.length });
 
   const openLoops = (state.openLoops || []).filter((l) => l.status !== 'closed');
@@ -108,4 +123,4 @@ function scoreConfidence(state) {
   return { score, band, loopClear, penalties, openDefects: openDefects.length };
 }
 
-module.exports = { scoreFriction, scoreConfidence, clamp };
+module.exports = { scoreFriction, scoreConfidence, clamp, isDefectOpen, TERMINAL_DEFECT_STATUSES };
