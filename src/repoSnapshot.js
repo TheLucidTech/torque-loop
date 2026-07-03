@@ -27,6 +27,17 @@ const IGNORE_DIRS = new Set([
   '.vscode',
 ]);
 
+// Dot-directories that ARE meaningful to a plugin/repo and must not be hidden.
+// Without this, a blanket dot-dir skip loses .claude-plugin, .github, etc. — the
+// exact directories a Claude Code plugin lives in.
+const DOT_DIR_ALLOWLIST = new Set(['.claude', '.claude-plugin', '.github', '.ratchet']);
+
+function shouldSkipDir(name) {
+  if (IGNORE_DIRS.has(name)) return true;
+  if (name.startsWith('.') && !DOT_DIR_ALLOWLIST.has(name)) return true;
+  return false;
+}
+
 const SIGNAL_FILES = [
   'package.json',
   'pnpm-workspace.yaml',
@@ -68,8 +79,8 @@ function walk(root, maxFiles = 4000) {
     }
     for (const e of entries) {
       if (e.isDirectory()) {
-        // Skip ignored dirs and dot-dirs (e.g. .git, .cache) entirely.
-        if (IGNORE_DIRS.has(e.name) || e.name.startsWith('.')) continue;
+        // Skip ignored dirs and non-allowlisted dot-dirs (e.g. .git, .cache).
+        if (shouldSkipDir(e.name)) continue;
         stack.push(path.join(dir, e.name));
       } else if (e.isFile()) {
         fileCount++;
@@ -89,7 +100,7 @@ function topDirs(root) {
   try {
     return fs
       .readdirSync(root, { withFileTypes: true })
-      .filter((e) => e.isDirectory() && !IGNORE_DIRS.has(e.name))
+      .filter((e) => e.isDirectory() && !shouldSkipDir(e.name))
       .map((e) => e.name)
       .sort();
   } catch (_e) {

@@ -64,6 +64,40 @@ function writeJson(file, obj) {
   fs.writeFileSync(file, JSON.stringify(obj, null, 2) + '\n', 'utf8');
 }
 
+// Preserve, never silently lose. A tool whose promise is persistent state must
+// not throw away a malformed file — a bad write or a manual edit could corrupt
+// it. Missing/empty → fresh (quiet). Malformed → copy the bad bytes to
+// <file>.corrupt.<timestamp>.json, warn, then let the caller reinitialize.
+function backupCorrupt(file, raw) {
+  try {
+    const stamp = schemas.nowIso().replace(/[:.]/g, '-');
+    const dest = `${file}.corrupt.${stamp}.json`;
+    fs.writeFileSync(dest, raw, 'utf8');
+    process.stderr.write(
+      `[ratchet] ${path.basename(file)} was malformed — backed up to ${path.basename(dest)} and reinitialized.\n`
+    );
+    return dest;
+  } catch (_e) {
+    return null; // best effort; never block the session over a backup
+  }
+}
+
+function readJsonResilient(file) {
+  let raw;
+  try {
+    raw = fs.readFileSync(file, 'utf8');
+  } catch (_e) {
+    return null; // missing / unreadable → caller creates fresh
+  }
+  if (!raw.trim()) return null; // empty file → fresh, no noisy backup
+  try {
+    return JSON.parse(raw);
+  } catch (_e) {
+    backupCorrupt(file, raw);
+    return null;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // State lifecycle.
 // ---------------------------------------------------------------------------
@@ -84,9 +118,10 @@ function initProject(cwd, { force = false } = {}) {
 }
 
 function loadState(cwd) {
-  const existing = readJson(statePath(cwd));
+  const existing = readJsonResilient(statePath(cwd));
   if (existing) return existing;
-  // Auto-init on first read so skills never hit a missing file.
+  // Auto-init on first read so skills never hit a missing file. A corrupt file
+  // has already been backed up by readJsonResilient before we overwrite it.
   const fresh = schemas.newState();
   writeJson(statePath(cwd), fresh);
   return fresh;
@@ -99,7 +134,7 @@ function saveState(cwd, state) {
 }
 
 function loadLedger(cwd) {
-  const existing = readJson(ledgerPath(cwd));
+  const existing = readJsonResilient(ledgerPath(cwd));
   if (existing) return existing;
   const fresh = schemas.newLedger();
   writeJson(ledgerPath(cwd), fresh);

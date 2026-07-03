@@ -17,6 +17,8 @@ const scoring = require('../src/scoring');
 const artifacts = require('../src/artifacts');
 const ledger = require('../src/ledger');
 const md = require('../src/markdown');
+const repo = require('../src/repoSnapshot');
+const cli = require('../src/cli');
 
 let passed = 0;
 function ok(name, fn) {
@@ -102,6 +104,50 @@ ok('markdown render does not throw on populated state', () => {
   assert.ok(out.includes('Ratchet state'));
   const exp = md.fullExport(state.loadState(cwd), state.loadLedger(cwd));
   assert.ok(exp.includes('Ratchet compile'));
+});
+
+ok('compile done clears dirty, stamps lastCompileAt, records history', () => {
+  cli.run(['node', 'ratchet', 'touch', 'README.md']);
+  assert.strictEqual(state.loadState(cwd).dirty, true, 'touch dirties state');
+  cli.run(['node', 'ratchet', 'compile', 'done']);
+  const s = state.loadState(cwd);
+  assert.strictEqual(s.dirty, false, 'compile done clears dirty (Stop hook stays quiet)');
+  assert.ok(s.lastCompileAt, 'lastCompileAt is stamped');
+  assert.ok(s.history.some((h) => h.event === 'compile.done'), 'compile.done recorded in history');
+});
+
+ok('corrupt state.json is backed up, not silently lost', () => {
+  const sp = state.statePath(cwd);
+  state.initProject(cwd, { force: true });
+  fs.writeFileSync(sp, '{ this is not valid json', 'utf8');
+  const loaded = state.loadState(cwd); // triggers backup + fresh
+  assert.ok(loaded && loaded.version, 'a fresh state is created');
+  const dir = path.dirname(sp);
+  const backups = fs.readdirSync(dir).filter((f) => f.startsWith('state.json.corrupt.'));
+  assert.ok(backups.length >= 1, 'a corrupt backup exists');
+  const raw = fs.readFileSync(path.join(dir, backups[0]), 'utf8');
+  assert.ok(raw.includes('this is not valid json'), 'backup preserves the original bad bytes');
+});
+
+ok('corrupt ledger.json is backed up, not silently lost', () => {
+  const lp = state.ledgerPath(cwd);
+  fs.writeFileSync(lp, 'garbage{', 'utf8');
+  const loaded = state.loadLedger(cwd);
+  assert.ok(loaded && loaded.version, 'a fresh ledger is created');
+  const backups = fs.readdirSync(path.dirname(lp)).filter((f) => f.startsWith('ledger.json.corrupt.'));
+  assert.ok(backups.length >= 1, 'a corrupt ledger backup exists');
+});
+
+ok('repo snapshot sees allowlisted dot dirs, skips .git / node_modules', () => {
+  const proj = path.join(tmp, 'snap-fixture');
+  for (const d of ['.claude-plugin', '.github', '.git', 'node_modules', 'src']) {
+    fs.mkdirSync(path.join(proj, d), { recursive: true });
+  }
+  const snap = repo.snapshot(proj);
+  assert.ok(snap.dirs.includes('.claude-plugin'), '.claude-plugin is visible');
+  assert.ok(snap.dirs.includes('.github'), '.github is visible');
+  assert.ok(!snap.dirs.includes('.git'), '.git is skipped');
+  assert.ok(!snap.dirs.includes('node_modules'), 'node_modules is skipped');
 });
 
 fs.rmSync(tmp, { recursive: true, force: true });

@@ -46,10 +46,12 @@ ratchet artifact add '{"title":"...","kind":"...","status":"...","holes":["..."]
 ratchet defect add '{"severity":"...","summary":"...","status":"..."}'                 # if any new
 ratchet state append openLoops '{"text":"...","status":"open"}'                        # if any
 ratchet state set phase compile
-ratchet state set lastCompileAt "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+ratchet compile done
 ```
 
-Setting `lastCompileAt` clears the Stop-hook nag. Then emit the record:
+`ratchet compile done` clears the dirty flag, stamps `lastCompileAt`, and records a
+`compile.done` history event in one atomic move — which silences the Stop-hook nag. (Run it
+last: a `state set` after it would re-dirty the session.) Then emit the record:
 
 ```
 ratchet export markdown

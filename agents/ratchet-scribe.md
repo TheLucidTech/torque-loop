@@ -24,8 +24,9 @@ re-deriving anything. You are precise and you never embellish.
 4. **One-sentence memory.** Produce a single sentence that captures the session's state
    well enough to prime a cold start. This is the highest-value line; make it load-bearing.
 
-5. **Stamp the compile.** After writing, set `lastCompileAt` and clear the dirty flag by
-   running `ratchet state set lastCompileAt "<now>"` so the Stop hook stops nagging.
+5. **Stamp the compile.** After writing everything else, run `ratchet compile done` — it
+   stamps `lastCompileAt`, clears the dirty flag, and records a `compile.done` event in one
+   atomic move so the Stop hook stops nagging. Run it last, or a later `state set` re-dirties.
 
 ## Output shape
 
