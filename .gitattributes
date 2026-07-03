@@ -1,0 +1,15 @@
+# Normalize all text files to LF in the repository.
+* text=auto eol=lf
+
+# Executable CLI entrypoints MUST stay LF — a CRLF shebang (`#!/usr/bin/env node\r`)
+# is invalid and breaks the scripts on Linux/macOS.
+bin/ratchet        text eol=lf
+bin/ratchet-evolve text eol=lf
+*.js               text eol=lf
+*.json             text eol=lf
+*.md               text eol=lf
+*.yml              text eol=lf
+*.sh               text eol=lf
+
+# Binary assets — never touch line endings or try to diff.
+*.png binary

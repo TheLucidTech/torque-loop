@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "createdAt": "1970-01-01T00:00:00.000Z",
+  "updatedAt": "1970-01-01T00:00:00.000Z",
+  "title": "",
+  "objective": "",
+  "bottleneck": "",
+  "phase": "idle",
+  "dirty": false,
+  "lastCompileAt": null,
+  "confidence": null,
+  "nextAction": "",
+  "nextCommand": "",
+  "tags": [],
+  "decisions": [],
+  "artifacts": [],
+  "defects": [],
+  "assumptions": [],
+  "openLoops": [],
+  "touchedFiles": [],
+  "history": []
+}

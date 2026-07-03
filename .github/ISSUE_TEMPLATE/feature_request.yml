@@ -1,0 +1,38 @@
+name: Feature request
+description: Propose a new command, behavior, or improvement.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Torque Loop stays small on purpose. The best proposals sharpen an existing
+        loop rather than bolt on a new surface. Tell us the pressure it creates.
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What friction are you hitting today? What does the tool fail to force?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed change
+      description: What should it do? Which command / file does it touch?
+    validations:
+      required: true
+  - type: textarea
+    id: pressure
+    attributes:
+      label: What forward move does this create?
+      description: >
+        Every command should force a choice, create/test an artifact, patch a defect,
+        serialize state, kill an option, or push to a higher-yield move. Which is this?
+    validations:
+      required: false
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+    validations:
+      required: false

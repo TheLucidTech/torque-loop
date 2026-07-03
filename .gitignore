@@ -1,0 +1,7 @@
+node_modules/
+*.log
+.DS_Store
+.ratchet/
+# Local state written during self-tests
+/tmp/
+scratchpad/

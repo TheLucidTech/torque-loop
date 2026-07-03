@@ -1,0 +1,45 @@
+{
+  "name": "@torque-loop/plugin",
+  "version": "0.1.0",
+  "description": "Torque Loop — a Claude Code plugin that evolves ambiguity into shipped, tested, serialized artifacts through evidence-gated loops. Not affiliated with Anthropic.",
+  "license": "MIT",
+  "author": "Danny Gillespie",
+  "type": "commonjs",
+  "bin": {
+    "ratchet": "bin/ratchet",
+    "ratchet-evolve": "bin/ratchet-evolve"
+  },
+  "main": "src/cli.js",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "test": "node test/cli.test.js && node test/evolve.test.js",
+    "ratchet": "node bin/ratchet",
+    "ratchet-evolve": "node bin/ratchet-evolve"
+  },
+  "files": [
+    "bin",
+    "src",
+    "skills",
+    "agents",
+    "hooks",
+    "templates",
+    ".claude-plugin"
+  ],
+  "keywords": [
+    "torque-loop",
+    "claude-code",
+    "plugin",
+    "workflow",
+    "quality",
+    "qa",
+    "state",
+    "decision",
+    "evolution"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/TheLucidTech/torque-loop.git"
+  }
+}

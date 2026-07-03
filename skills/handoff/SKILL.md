@@ -1,0 +1,67 @@
+---
+name: handoff
+description: Produce a compact handoff for another model, agent, teammate, or future session. Use when work must transfer without losing state. Returns a self-contained brief — objective, what's done, what's decided, what's open, the exact next action, and the context needed to act — compressed so the receiver can start immediately with zero re-derivation.
+---
+
+# /ratchet:handoff — transfer without loss
+
+A handoff fails when the receiver has to reconstruct what you already knew. This command
+produces a self-contained brief that lets another model, agent, teammate, or future you
+start acting immediately — no re-reading the session, no re-deriving decisions.
+
+## Step 0 — Load state
+
+```
+ratchet export markdown
+ratchet score confidence
+```
+
+Delegate to the `ratchet-scribe` subagent for a long or high-stakes session.
+
+## Procedure
+
+Compress the session to exactly what the receiver needs to act — and nothing they'd have
+to skim past:
+
+1. **Objective** — the locked target, one line.
+2. **State of play** — what's done, what's in flight, current confidence.
+3. **Decisions made** — commitments + their reversal tripwires (so the receiver doesn't
+   relitigate settled calls).
+4. **Artifacts** — what exists, where, and each one's known holes.
+5. **Open defects / risks** — by severity.
+6. **The single next action** — the exact first move, concrete enough to start on.
+7. **Context to act** — the minimum files, commands, or facts the receiver needs. Point to
+   locations; don't paste the world.
+8. **Watch-outs** — the traps you already hit or foresee.
+
+## Rules
+
+- **Self-contained.** If the receiver needs to ask you a question to start, the handoff
+  failed. Anticipate the first question and answer it.
+- **Compressed, not lossy.** Cut commentary; keep every fact that changes a move.
+- **One next action, not a menu.** Handoffs die in ambiguity — name the single move.
+
+## Output contract
+
+```
+# Handoff: <working title>
+OBJECTIVE: <one line>
+STATE: <done / in-flight / confidence score>
+DECISIONS: <commitment — tripwire> (each)
+ARTIFACTS: <title — location — holes> (each)
+OPEN RISKS: <[severity] summary> (each)
+NEXT ACTION: <the single concrete first move>
+CONTEXT TO ACT: <files / commands / facts, by location>
+WATCH-OUTS: <traps>
+NEXT COMMAND: /ratchet:<command>
+```
+
+## Serialize
+
+```
+ratchet artifact add '{"title":"handoff brief","kind":"decision-record","status":"v0"}'
+ratchet state set lastCompileAt "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+```
+
+A good handoff is measured by one thing: the receiver's first action is correct without
+asking you anything.

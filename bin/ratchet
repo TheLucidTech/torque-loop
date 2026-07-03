@@ -1,0 +1,12 @@
+#!/usr/bin/env node
+'use strict';
+
+// Ratchet CLI entrypoint. Added to the Bash tool's PATH while the plugin is
+// enabled. All real logic lives in ../src so it stays testable.
+
+try {
+  require('../src/cli').run(process.argv);
+} catch (e) {
+  process.stderr.write(`ratchet: ${e && e.message ? e.message : e}\n`);
+  process.exitCode = 1;
+}
