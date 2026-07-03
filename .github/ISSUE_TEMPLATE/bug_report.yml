@@ -41,7 +41,7 @@ body:
       options:
         - A /ratchet:* slash command (plugin)
         - The `ratchet` CLI
-        - The `ratchet-evolve` CLI / loop
+        - The `ratchet-evolve` CLI / `/ratchet:evolve` loop
         - A hook (SessionStart / PostToolUse / Stop)
         - Install / marketplace
         - Docs / README
@@ -53,7 +53,7 @@ body:
     attributes:
       label: Versions
       description: Output of `node --version` and `ratchet --version`, plus your OS.
-      placeholder: node v20.11.0 · ratchet 0.1.0 · Windows 11
+      placeholder: node v20.11.0 · ratchet 0.2.0 · Windows 11
     validations:
       required: true
   - type: textarea
