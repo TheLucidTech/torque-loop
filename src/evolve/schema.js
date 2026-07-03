@@ -50,4 +50,27 @@ function newEvent(f = {}) {
   };
 }
 
-module.exports = { PRESSURES, MODES, VERDICTS, nowIso, newEvent };
+// The proof gate. "No proof → no keep": a KEEP verdict may only be recorded when
+// verification actually produced evidence and did not fail. REVERT and ASK are
+// exempt — they exist precisely to record the absence of a proven improvement.
+// Throws (does not return a boolean) so a bad KEEP can never be silently written.
+function validateKeepGate(event) {
+  if (!event || event.verdict !== 'KEEP') return event;
+  const v = event.verification || {};
+  const result = v.result;
+  const commands = Array.isArray(v.commands) ? v.commands : [];
+  const manualChecks = Array.isArray(v.manualChecks) ? v.manualChecks : [];
+
+  if (result === 'fail') {
+    throw new Error('cannot KEEP: verification failed');
+  }
+  if (!commands.length && !manualChecks.length) {
+    throw new Error('cannot KEEP: no verification evidence');
+  }
+  if (result === 'manual' && !manualChecks.length) {
+    throw new Error('cannot KEEP: manual verification requires explicit checks');
+  }
+  return event;
+}
+
+module.exports = { PRESSURES, MODES, VERDICTS, nowIso, newEvent, validateKeepGate };

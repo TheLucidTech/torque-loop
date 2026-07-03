@@ -1,0 +1,12 @@
+{
+  "target": "",
+  "goal": "",
+  "iteration": 1,
+  "pressure": { "primary": "", "secondary": "" },
+  "chosenMutation": "",
+  "filesTouched": [],
+  "verification": { "commands": [], "manualChecks": [], "result": "manual" },
+  "verdict": "ASK",
+  "remainingRisks": [],
+  "nextEdge": ""
+}
