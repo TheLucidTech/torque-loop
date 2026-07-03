@@ -174,6 +174,13 @@ depth that earns it: snap to `build → verify` when the task is trivial, open t
 when it isn't. In Codex, ask it to use the matching Torque Loop skill, for example
 `torque-loop:ignite` or `torque-loop:evolve`.
 
+> **Provenance — the aperture dial.** The aperture read was grafted from an external
+> `auto-aperture` skill fork. Rather than import it wholesale, we examined it against the
+> existing loop: most of it already existed under other names (`cut` / `lock` / `decide` /
+> `build` / `verify` / `compile`), so we took only its one novel primitive — scoring
+> uncertainty to meter how much loop to run — and dropped the rest to avoid a second
+> dialect. General mechanism, ratchet's own vocabulary.
+
 ### Core loop
 
 | Command | Purpose |
