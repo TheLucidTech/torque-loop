@@ -168,8 +168,10 @@ one shared data directory.
 
 ## Commands
 
-In Claude Code, run `/ratchet:ignite` when you don't know which command to run — it drives
-the full loop. In Codex, ask it to use the matching Torque Loop skill, for example
+In Claude Code, run `/ratchet:ignite` when you don't know which command to run — it reads the
+task's uncertainty with the **aperture dial** (`ratchet score aperture`) and runs only the loop
+depth that earns it: snap to `build → verify` when the task is trivial, open to the full loop
+when it isn't. In Codex, ask it to use the matching Torque Loop skill, for example
 `torque-loop:ignite` or `torque-loop:evolve`.
 
 ### Core loop

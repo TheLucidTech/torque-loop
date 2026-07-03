@@ -27,7 +27,39 @@ If `ratchet` is not on PATH, call the plugin-local CLI as
 `$CLAUDE_PLUGIN_ROOT`; in Codex local development, use this repo root or the installed
 plugin path shown by `codex plugin list --json`.
 
-## The pipeline (run all seven; do not skip)
+## Step 1 — Aperture Read (meter the loop)
+
+Before running the pipeline, score how much of it this task earns. Rate five
+uncertainty dimensions 0–2 and let the CLI set the depth:
+
+```
+ratchet score aperture '{"ambiguity":_,"terrain":_,"taste":_,"blastRadius":_,"reversibility":_}'
+```
+
+- **ambiguity** — goals / acceptance criteria / constraints unclear?
+- **terrain** — codebase / domain / tooling unfamiliar?
+- **taste** — would the user recognize the right answer only once shown?
+- **blastRadius** — could it hit data, security, production, many files/users?
+- **reversibility** — hard to undo or validate?
+
+The result names an aperture and the exact ratchet sequence to run:
+
+| Level | Score | Run |
+|---|---|---|
+| A0 Snap | 0–2 | `build → verify` — do it, prove it, stop. |
+| A1 Narrow | 3–4 | `lock → build → verify → compile`. |
+| A2 Working | 5–6 | the full seven-step pipeline below. |
+| A3 Wide | 7–8 | add `auction` + `decide`; prototype / reference before build. |
+| A4 Max | 9–10 | `lock → cut → decide`, then **STOP — produce options, do not build** until constraints are locked. |
+
+Widen one level after failed verification, a surprising repo constraint, or
+conflicting requirements; narrow one after the user locks a decision or the work
+goes mechanical.
+
+**Do not inflate ceremony.** Running the full loop on an A0 task is the same failure
+as skipping it on an A4 task. Spend proof where uncertainty earns it.
+
+## The pipeline (the A2 default — run the aperture's metered sequence, not always all seven)
 
 1. **Lock the target.** Apply the discipline of `/ratchet:lock`. Produce: literal
    object, operation, output shape, real outcome, proof-of-done, smallest artifact,
@@ -64,6 +96,7 @@ plugin path shown by `codex plugin list --json`.
 Return exactly these blocks, in order:
 
 ```
+APERTURE: <A0–A4 level, score/10> — ran: <the metered sequence>
 LOCKED TARGET: <one line>
 CHOSEN BOTTLENECK: <one line + why it beats the runner-up>
 KILL-ASSUMPTION: <the one that most needs a test> — test: <cheapest falsification>

@@ -191,6 +191,48 @@ ok('friction rejects non-array', () => {
   assert.throws(() => scoring.scoreFriction({ not: 'an array' }), /array/);
 });
 
+// --- aperture dial (0.4) ----------------------------------------------------
+
+ok('aperture meters loop depth from uncertainty', () => {
+  const snap = scoring.scoreAperture({ ambiguity: 0, terrain: 0, taste: 0, blastRadius: 0, reversibility: 0 });
+  assert.strictEqual(snap.score, 0);
+  assert.strictEqual(snap.level, 'A0');
+  assert.strictEqual(snap.implement, true);
+  assert.deepStrictEqual(snap.sequence, ['build', 'verify']);
+
+  const mid = scoring.scoreAperture({ ambiguity: 1, terrain: 1, taste: 1, blastRadius: 1, reversibility: 1 });
+  assert.strictEqual(mid.score, 5);
+  assert.strictEqual(mid.level, 'A2');
+
+  const max = scoring.scoreAperture({ ambiguity: 2, terrain: 2, taste: 2, blastRadius: 2, reversibility: 2 });
+  assert.strictEqual(max.score, 10);
+  assert.strictEqual(max.level, 'A4');
+  assert.strictEqual(max.implement, false, 'A4 must not build before constraints are locked');
+  assert.ok(!max.sequence.includes('build'), 'A4 produces options, not code');
+});
+
+ok('aperture defaults a missing dimension to neutral, not certain', () => {
+  // 4 missing dims default to 1 each (=4) + blastRadius 2 = 6 → A2, not A0
+  const a = scoring.scoreAperture({ blastRadius: 2 });
+  assert.strictEqual(a.score, 6);
+  assert.strictEqual(a.level, 'A2');
+});
+
+ok('aperture clamps out-of-range dimensions and rejects non-objects', () => {
+  const a = scoring.scoreAperture({ ambiguity: 9, terrain: -3, taste: 2, blastRadius: 0, reversibility: 0 });
+  assert.strictEqual(a.dimensions.ambiguity, 2);
+  assert.strictEqual(a.dimensions.terrain, 0);
+  assert.throws(() => scoring.scoreAperture([1, 2, 3]), /object/);
+  assert.throws(() => scoring.scoreAperture('nope'), /object/);
+});
+
+ok('aperture renders with its metered ratchet loop', () => {
+  const out = md.aperture(scoring.scoreAperture({ ambiguity: 2, terrain: 1, taste: 2, blastRadius: 1, reversibility: 1 }));
+  assert.ok(/Aperture: A3 Wide/.test(out));
+  assert.ok(/Metered loop/.test(out));
+  assert.ok(/ratchet:build/.test(out));
+});
+
 ok('markdown render does not throw on populated state', () => {
   const out = md.stateSummary(state.loadState(cwd));
   assert.ok(out.includes('Ratchet state'));

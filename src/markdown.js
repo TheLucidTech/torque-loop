@@ -91,6 +91,24 @@ function confidence(state) {
 }
 
 // `○` = still draining confidence, `●` = terminal (resolved/waived/superseded).
+// The aperture dial: how much of the loop this task earns, and the metered
+// sequence of ratchet skills to run at that depth.
+function aperture(a) {
+  const d = a.dimensions || {};
+  const o = [];
+  o.push(`### Aperture: ${a.level} ${a.name} — score ${a.score}/10`);
+  o.push(
+    `Uncertainty: ambiguity ${d.ambiguity} · terrain ${d.terrain} · taste ${d.taste} · blast ${d.blastRadius} · reversibility ${d.reversibility}`
+  );
+  o.push(
+    a.implement
+      ? '**Implement:** yes — run the loop at this depth.'
+      : '**Implement:** NO — lock constraints and produce options first; do not build yet.'
+  );
+  o.push(`**Metered loop:** ${a.sequence.map((s) => `\`/ratchet:${s}\``).join(' → ')}`);
+  return o.join('\n');
+}
+
 function defectList(defects) {
   if (!defects || !defects.length) return '_no defects recorded_';
   const lines = ['### Defects'];
@@ -205,4 +223,4 @@ function fullExport(state, ledger) {
   return out.join('\n');
 }
 
-module.exports = { stateSummary, friction, confidence, defectList, defectOne, gitStatusRefs, repoSnapshot, fullExport, dash, bullets };
+module.exports = { stateSummary, friction, confidence, aperture, defectList, defectOne, gitStatusRefs, repoSnapshot, fullExport, dash, bullets };
