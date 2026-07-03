@@ -3,7 +3,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const { newEvent } = require('./schema');
+const { newEvent, validateKeepGate } = require('./schema');
 
 // The evolution log lives in the project, not the shared plugin data dir:
 // evolution events are tied to specific artifacts in this repo, so the trail
@@ -48,6 +48,9 @@ function nextId(cwd, iso) {
 
 function appendEvent(cwd, fields) {
   const event = newEvent(fields);
+  // Proof gate: refuse to persist a KEEP without verification evidence. Throws
+  // before any write, so the log never contains an unproven kept mutation.
+  validateKeepGate(event);
   if (!event.id) event.id = nextId(cwd, event.timestamp);
   const file = logPath(cwd);
   fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -57,12 +60,13 @@ function appendEvent(cwd, fields) {
 
 function status(cwd = process.cwd()) {
   const events = readEvents(cwd);
-  if (!events.length) return { events: 0, targets: [], last: null };
+  if (!events.length) return { events: 0, kept: 0, reverted: 0, asks: 0, targets: [], last: null };
   const targets = [...new Set(events.map((e) => e.target))];
   const last = events[events.length - 1];
   const kept = events.filter((e) => e.verdict === 'KEEP').length;
   const reverted = events.filter((e) => e.verdict === 'REVERT').length;
-  return { events: events.length, kept, reverted, targets, last };
+  const asks = events.filter((e) => e.verdict === 'ASK').length;
+  return { events: events.length, kept, reverted, asks, targets, last };
 }
 
 module.exports = { logPath, readEvents, appendEvent, nextId, status };

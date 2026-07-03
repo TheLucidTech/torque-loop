@@ -21,7 +21,7 @@ It bundles two things:
 
 - **The Ratchet command family** (`/ratchet:*`) — a consequence engine that turns ambiguity
   into shipped, falsifiable artifacts through adversarial execution loops.
-- **`/ratchet-evolve`** — a narrower, bounded loop that mutates one artifact, tests it, and
+- **`/ratchet:evolve`** — a narrower, bounded loop that mutates one artifact, tests it, and
   keeps only proven improvement.
 
 Every command produces *pressure*, not just insight. Each one forces a choice, creates an
@@ -113,7 +113,7 @@ node bin/ratchet --help
 Verify:
 
 ```bash
-ratchet --version      # -> ratchet 0.1.0
+ratchet --version      # -> ratchet 0.2.0
 ratchet init
 ratchet status
 ```
@@ -175,15 +175,15 @@ artifact (code file, prompt, skill, README, spec, workflow):
 
 | Command | Purpose |
 | --- | --- |
-| `/ratchet:ratchet-evolve` | Mutate → test → keep only proven improvement → serialize the next edge. |
+| `/ratchet:evolve` | Mutate → test → keep only proven improvement → serialize the next edge. |
 
 ```
 LOCK → SNAPSHOT → PRESSURE → MUTATE → JUDGE → APPLY → VERIFY → KEEP/REVERT/ASK → RECORD → NEXT EDGE
 ```
 
 ```bash
-/ratchet:ratchet-evolve src/auth/session.js --goal "reduce login-state race conditions" --test "npm test -- auth" --mode code
-/ratchet:ratchet-evolve README.md --goal "make install impossible to misunderstand" --mode docs
+/ratchet:evolve src/auth/session.js --goal "reduce login-state race conditions" --test "npm test -- auth" --mode code
+/ratchet:evolve README.md --goal "make install impossible to misunderstand" --mode docs
 ```
 
 It defaults to `--iterations 2` and **proposes** patches without `--write`. Its rule is
@@ -192,8 +192,30 @@ this better" — it evolves along one chosen pressure vector and records every v
 `.ratchet/evolve-log.jsonl` via the `ratchet-evolve` helper CLI.
 
 > Note: because plugin skills are namespaced by the plugin, the command is invoked as
-> `/ratchet:ratchet-evolve`. Drop the `SKILL.md` into `~/.claude/skills/ratchet-evolve/` to
-> use it as a bare `/ratchet-evolve` outside the plugin.
+> `/ratchet:evolve` (renamed from the older `ratchet-evolve` skill in v0.2.0 — no alias is
+> kept). Drop the `SKILL.md` into `~/.claude/skills/evolve/` to use it as a bare `/evolve`
+> outside the plugin.
+
+#### One run, end to end
+
+```text
+Before:    README install path is ambiguous — global vs. project vs. CLI-only blur together.
+
+Command:   /ratchet:evolve README.md --goal "make install impossible to misunderstand" --mode docs
+
+Mutation:  Split install into three labelled paths (global plugin, project-local, CLI-only),
+           each with its own verify step. No other section touched.
+
+Verify:    Manual docs checks — first-use path unambiguous, no contradiction, no missing step
+           between install and first success. All passed.
+
+Verdict:   KEEP        ← allowed only because evidence exists; the proof gate rejects a bare KEEP
+
+Next edge: Add a 60-second GIF of the plugin install.  (readable later via `ratchet-evolve next`)
+```
+
+Every verdict lands in `.ratchet/evolve-log.jsonl`. A `KEEP` without verification evidence is
+refused at write time — the loop cannot record progress it did not prove.
 
 ---
 

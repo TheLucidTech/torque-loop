@@ -9,7 +9,7 @@ const journal = require('./journal');
 const pressure = require('./pressure');
 const { PRESSURES, MODES } = require('./schema');
 
-const VERSION = '0.1.0';
+const VERSION = require('../../package.json').version;
 
 function out(s) {
   process.stdout.write(String(s) + '\n');
@@ -102,12 +102,24 @@ function renderStatus(s) {
   if (!s.events) return '### Evolve log\n_empty — no evolution events recorded yet._';
   const o = [];
   o.push('### Evolve log');
-  o.push(`- Events: ${s.events} (kept ${s.kept}, reverted ${s.reverted})`);
-  o.push(`- Targets: ${s.targets.join(', ')}`);
+  o.push(`- Events: ${s.events}`);
+  o.push(`- Kept: ${s.kept}`);
+  o.push(`- Reverted: ${s.reverted}`);
+  o.push(`- Asks: ${s.asks}`);
+  o.push('- Active targets:');
+  for (const t of s.targets) o.push(`  - ${t}`);
   if (s.last) {
-    o.push(`- Last: ${s.last.id} — ${s.last.target} — verdict **${s.last.verdict}**`);
+    o.push(`- Last verdict: ${s.last.verdict} (${s.last.id})`);
     if (s.last.nextEdge) o.push(`- Next edge: ${s.last.nextEdge}`);
   }
+  return o.join('\n');
+}
+
+function renderNext(s) {
+  const edge = s.last && s.last.nextEdge ? s.last.nextEdge : '';
+  if (!edge) return '### Next edge\n_none recorded — run an evolve iteration first._';
+  const o = ['### Next edge', edge];
+  if (s.last && s.last.target) o.push('', `Target: ${s.last.target}`);
   return o.join('\n');
 }
 
@@ -119,6 +131,11 @@ function run(argv) {
   const cwd = process.cwd();
   const asJson = Boolean(opts.json);
   const [group, sub] = pos;
+
+  // `--version` / `--help` parse into opts, not pos, so handle them before the
+  // positional dispatch — otherwise `ratchet-evolve --version` prints help.
+  if (opts.version) return out(`ratchet-evolve ${VERSION}`);
+  if (opts.help && group == null) return help();
 
   switch (group) {
     case undefined:
@@ -167,6 +184,15 @@ function run(argv) {
       return out(asJson ? JSON.stringify(s, null, 2) : renderStatus(s));
     }
 
+    case 'next': {
+      const s = journal.status(cwd);
+      if (asJson) {
+        const edge = s.last && s.last.nextEdge ? s.last.nextEdge : '';
+        return out(JSON.stringify({ nextEdge: edge, from: s.last ? s.last.id : null, target: s.last ? s.last.target : null }, null, 2));
+      }
+      return out(renderNext(s));
+    }
+
     case 'pressure': {
       const info = pressure.suggest(sub || 'code');
       return out(asJson ? JSON.stringify(info, null, 2) : JSON.stringify(info, null, 2));
@@ -189,8 +215,9 @@ function help() {
       '  ratchet-evolve snapshot <target> [--goal g] [--mode m]   capture baseline (hash, git, mode)',
       '  ratchet-evolve score mutation <json>                     rank candidates, pick one (--json)',
       '  ratchet-evolve verify <target> [--test "cmd"] [--mode m] gather verification evidence (--json)',
-      '  ratchet-evolve log append <json>                         write an evolution event',
+      '  ratchet-evolve log append <json>                         write an evolution event (KEEP needs proof)',
       '  ratchet-evolve log | status                              read the evolve log (--json)',
+      '  ratchet-evolve next                                      show the last recorded next edge (--json)',
       '  ratchet-evolve pressure [mode]                           suggested pressure vector for a mode',
       '',
       `  modes:     ${MODES.join(', ')}`,

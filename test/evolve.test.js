@@ -19,6 +19,7 @@ const score = require('../src/evolve/score');
 const verify = require('../src/evolve/verify');
 const journal = require('../src/evolve/journal');
 const pressure = require('../src/evolve/pressure');
+const schema = require('../src/evolve/schema');
 
 let passed = 0;
 function ok(name, fn) {
@@ -82,7 +83,12 @@ ok('verify without a command returns manual checks', () => {
 });
 
 ok('journal appends events with dated ids and status', () => {
-  const e1 = journal.appendEvent(process.cwd(), { target: 'a.md', verdict: 'KEEP', nextEdge: 'do x' });
+  const e1 = journal.appendEvent(process.cwd(), {
+    target: 'a.md',
+    verdict: 'KEEP',
+    nextEdge: 'do x',
+    verification: { manualChecks: ['reviewed the delta'], result: 'manual' },
+  });
   assert.strictEqual(e1.id, 'evo_2026_07_03_001');
   const e2 = journal.appendEvent(process.cwd(), { target: 'a.md', verdict: 'REVERT' });
   assert.strictEqual(e2.id, 'evo_2026_07_03_002');
@@ -90,7 +96,46 @@ ok('journal appends events with dated ids and status', () => {
   assert.strictEqual(s.events, 2);
   assert.strictEqual(s.kept, 1);
   assert.strictEqual(s.reverted, 1);
+  assert.strictEqual(s.asks, 0);
   assert.strictEqual(s.last.verdict, 'REVERT');
+});
+
+ok('proof gate: KEEP is allowed with command or manual evidence', () => {
+  const keep = (over) => schema.newEvent({ target: 't', verdict: 'KEEP', ...over });
+  // passing command evidence
+  schema.validateKeepGate(keep({ verification: { commands: [{ pass: true }], result: 'pass' } }));
+  // explicit manual checks
+  schema.validateKeepGate(keep({ verification: { manualChecks: ['a lazy model cannot escape'], result: 'manual' } }));
+});
+
+ok('proof gate: KEEP is rejected without proof', () => {
+  const keep = (over) => schema.newEvent({ target: 't', verdict: 'KEEP', ...over });
+  // failed verification
+  assert.throws(
+    () => schema.validateKeepGate(keep({ verification: { commands: [{ pass: false }], result: 'fail' } })),
+    /verification failed/
+  );
+  // no evidence at all
+  assert.throws(
+    () => schema.validateKeepGate(keep({ verification: { commands: [], manualChecks: [], result: 'manual' } })),
+    /no verification evidence/
+  );
+  // claims pass but carries no evidence
+  assert.throws(
+    () => schema.validateKeepGate(keep({ verification: { commands: [], manualChecks: [], result: 'pass' } })),
+    /no verification evidence/
+  );
+});
+
+ok('proof gate: REVERT and ASK bypass the gate', () => {
+  schema.validateKeepGate(schema.newEvent({ target: 't', verdict: 'REVERT', verification: { result: 'fail' } }));
+  schema.validateKeepGate(schema.newEvent({ target: 't', verdict: 'ASK' }));
+});
+
+ok('proof gate: appendEvent refuses to persist an unproven KEEP', () => {
+  assert.throws(() => journal.appendEvent(process.cwd(), { target: 'b.md', verdict: 'KEEP' }), /cannot KEEP/);
+  const s = journal.status(process.cwd());
+  assert.ok(!s.targets.includes('b.md'), 'the rejected KEEP was never written');
 });
 
 ok('pressure suggests a vector and flags the rewrite trap', () => {
