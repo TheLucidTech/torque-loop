@@ -62,6 +62,9 @@ function scoreFriction(obstacles) {
     winner,
     runnerUp,
     margin: winner && runnerUp ? winner.priority - runnerUp.priority : null,
+    // A score is only honest if it names what it ranked. This ranking sees only
+    // the obstacles supplied — an unlisted blocker is invisible to it.
+    scope: 'only the obstacles supplied — an unlisted blocker is invisible to this ranking',
   };
 }
 
@@ -69,6 +72,16 @@ function scoreFriction(obstacles) {
 // Confidence. Starts at 100, drained by unresolved pressure. Never below 0.
 // This is the loop's stop condition: high confidence + zero critical debt.
 // ---------------------------------------------------------------------------
+
+// One band ladder, shared by every confidence layer so "converging" means the
+// same thing whether it describes an artifact, a session, or the ledger.
+function confidenceBand(score) {
+  if (score >= 85) return 'ship-ready';
+  if (score >= 65) return 'converging';
+  if (score >= 40) return 'contested';
+  if (score >= 20) return 'fragile';
+  return 'blocked';
+}
 
 function scoreConfidence(state) {
   const penalties = [];
@@ -105,12 +118,7 @@ function scoreConfidence(state) {
 
   const totalCost = penalties.reduce((s, p) => s + p.cost, 0);
   const score = Math.max(0, 100 - totalCost);
-
-  let band = 'blocked';
-  if (score >= 85) band = 'ship-ready';
-  else if (score >= 65) band = 'converging';
-  else if (score >= 40) band = 'contested';
-  else if (score >= 20) band = 'fragile';
+  const band = confidenceBand(score);
 
   // The loop may stop only when no critical/high debt remains AND nothing
   // core is untested AND there is a next action.
@@ -120,7 +128,142 @@ function scoreConfidence(state) {
     untested.length === 0 &&
     Boolean(state.nextAction && String(state.nextAction).trim());
 
-  return { score, band, loopClear, penalties, openDefects: openDefects.length };
+  return {
+    layer: 'session',
+    score,
+    band,
+    loopClear,
+    penalties,
+    openDefects: openDefects.length,
+    // Naming the scope is what keeps this number from gaslighting: it measures
+    // recorded pressure, not correctness. A high score on an empty ledger means
+    // "nothing is recorded as wrong," never "the code is right."
+    scope:
+      'the active loop — open defects, untested assumptions, open loops, and whether objective/next-action are set. Whether the loop may stop, not whether any one patch is good',
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Three-layer confidence. A single blunt score was the tool's worst UX bug: a
+// verified-green patch could read "0/blocked" purely because of unrelated
+// historical debt. Splitting the score by SCOPE fixes that — each layer answers
+// a different question and can never be dragged down by the others.
+//   artifact : is THIS patch good, on its own evidence?
+//   session  : can the active loop stop? (scoreConfidence, above)
+//   ledger   : how healthy is the historical QA record?
+// ---------------------------------------------------------------------------
+
+const ARTIFACT_SCOPE =
+  'the current live artifact only — its own holes, the defects attached to it, and its verification evidence. Unrelated open defects and ledger history are deliberately invisible';
+const LEDGER_SCOPE =
+  'the QA ledger\'s historical hygiene — open/stale defects and failing tests across all features. Not a judgment of the current patch';
+
+// Find the evolve event that verified a given artifact, matched by ship target
+// (path) or title. Never falls back to an unrelated event — an artifact with no
+// matching event is honestly "unverified", not borrowed-confidence.
+function verifyingEvent(artifact, events) {
+  if (!artifact || !Array.isArray(events)) return null;
+  const keys = [artifact.path, artifact.title].filter(Boolean);
+  for (let i = events.length - 1; i >= 0; i--) {
+    const e = events[i];
+    if (e && keys.includes(e.target)) return e;
+  }
+  return null;
+}
+
+function scoreArtifactConfidence(state, events = []) {
+  const live = (state.artifacts || []).filter((a) => a.status !== 'retracted' && a.status !== 'superseded');
+  const artifact = live[live.length - 1] || null;
+  const reasons = [];
+  if (!artifact) {
+    return { layer: 'artifact', score: null, band: 'none', artifact: null, reasons: ['no live artifact recorded'], scope: ARTIFACT_SCOPE };
+  }
+
+  let score = 100;
+  const holes = Array.isArray(artifact.holes) ? artifact.holes : [];
+  if (holes.length) {
+    score -= 15 * holes.length;
+    reasons.push(`${holes.length} explicit hole(s) in the artifact`);
+  }
+
+  // Only defects ATTACHED to this artifact and still open — never unrelated debt.
+  const attached = (state.defects || []).filter((d) => d.artifact === artifact.id && isDefectOpen(d));
+  for (const d of attached) {
+    const sev = (d.severity || 'medium').toLowerCase();
+    const cost = sev === 'critical' ? 25 : sev === 'high' ? 15 : sev === 'medium' ? 8 : 3;
+    score -= cost;
+  }
+  if (attached.length) reasons.push(`${attached.length} open defect(s) attached to this artifact`);
+
+  const ev = verifyingEvent(artifact, events);
+  if (!ev) {
+    score -= 10;
+    reasons.push('no independent verification recorded for this artifact');
+  } else if (ev.verdict === 'KEEP') {
+    const seam = ev.seam || {};
+    if (ev.mode === 'code' && seam.seamMatch && seam.seamMatch !== 'exact' && !(seam.waiver && seam.waiver.by)) {
+      score -= 20;
+      reasons.push(`proven only on a ${seam.seamMatch} seam — not the ship seam`);
+    } else {
+      reasons.push('verified: KEEP with acceptable seam evidence');
+    }
+    if (seam.independentFromBuilderMethod === false) {
+      score -= 10;
+      reasons.push('verification repeated the builder method (not independent)');
+    }
+  } else if (ev.verdict === 'REVERT' || ev.verdict === 'REVERTED_AND_LEARNED') {
+    score -= 30;
+    reasons.push(`last verdict was ${ev.verdict} — the change did not hold`);
+  } else if (ev.verdict === 'ASK') {
+    score -= 15;
+    reasons.push('last verdict was ASK — unresolved');
+  }
+
+  score = Math.max(0, Math.min(100, score));
+  return {
+    layer: 'artifact',
+    score,
+    band: confidenceBand(score),
+    artifact: { id: artifact.id, title: artifact.title, status: artifact.status },
+    reasons,
+    scope: ARTIFACT_SCOPE,
+  };
+}
+
+function scoreLedgerHealth(ledger) {
+  const defects = (ledger && ledger.defects) || [];
+  const tests = (ledger && ledger.tests) || [];
+  const openDefects = defects.filter(isDefectOpen).length;
+  const failingTests = tests.filter((t) => t.status === 'fail').length;
+  const reasons = [];
+  let score = 100;
+  if (openDefects) {
+    score -= 10 * openDefects;
+    reasons.push(`${openDefects} open ledger defect(s)`);
+  }
+  if (failingTests) {
+    score -= 8 * failingTests;
+    reasons.push(`${failingTests} failing test(s) in the ledger`);
+  }
+  if (!reasons.length) reasons.push('ledger clean — no open defects, no failing tests');
+  score = Math.max(0, Math.min(100, score));
+  return {
+    layer: 'ledger',
+    score,
+    band: confidenceBand(score),
+    counts: { openDefects, failingTests, defects: defects.length, tests: tests.length },
+    reasons,
+    scope: LEDGER_SCOPE,
+  };
+}
+
+// The three layers together — each scoped, none able to drag the others down.
+function scoreConfidenceLayers(state, ledger, events = []) {
+  return {
+    artifact: scoreArtifactConfidence(state, events),
+    session: scoreConfidence(state),
+    ledger: scoreLedgerHealth(ledger || {}),
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -174,12 +317,18 @@ function scoreAperture(dims) {
     implement: band.implement, // A4: do NOT build until constraints are locked
     sequence: band.sequence.slice(), // ratchet skills to run at this depth
     dimensions: scored,
+    // This reading is only valid for the task as scored, at scoring time.
+    scope: 'the one task scored, at scoring time — re-score if the task or its constraints change',
   };
 }
 
 module.exports = {
   scoreFriction,
   scoreConfidence,
+  scoreArtifactConfidence,
+  scoreLedgerHealth,
+  scoreConfidenceLayers,
+  confidenceBand,
   scoreAperture,
   clamp,
   isDefectOpen,

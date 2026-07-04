@@ -11,6 +11,8 @@ const repo = require('./repoSnapshot');
 const gitRefs = require('./gitRefs');
 const coldStart = require('./coldStart');
 const md = require('./markdown');
+const receipt = require('./receipt');
+const journal = require('./evolve/journal');
 const schemas = require('./schemas');
 
 const VERSION = require('../package.json').version;
@@ -89,6 +91,39 @@ function strOpt(v) {
 }
 
 // ---------------------------------------------------------------------------
+// Agent memory isolation (propose-only). Registered agents get isolated memory
+// by ROLE, enforced at the CLI boundary: only the scribe writes canonical state.
+// A builder or auditor is a propose-only agent — it emits the mutation for the
+// caller (or the scribe) to run, and its own process is refused write access, so
+// two agents can never clobber each other's record. Identity comes from
+// RATCHET_AGENT; the writer set is the scribe (and the unset/main caller). This
+// is a guard, not a sandbox: it makes the propose-only contract the agents
+// already follow impossible to violate by accident.
+// ---------------------------------------------------------------------------
+
+const WRITER_AGENTS = new Set(['scribe']);
+
+// Returns the propose-only agent name if one is active, else ''. The main caller
+// (RATCHET_AGENT unset) and the scribe both return '' — they may write.
+function proposeOnlyAgent() {
+  const a = (process.env.RATCHET_AGENT || '').trim().toLowerCase();
+  return a && !WRITER_AGENTS.has(a) ? a : '';
+}
+
+// Throw before any canonical-state mutation if a propose-only agent is driving.
+// The message tells the agent what to do instead — emit the command, don't run it.
+function assertMayWrite(action) {
+  const a = proposeOnlyAgent();
+  if (a) {
+    throw new Error(
+      `agent "${a}" has propose-only memory and may not mutate canonical state (${action}). ` +
+        'Emit the exact command for the caller or the ratchet-scribe to run instead. ' +
+        '(Only the scribe writes canonical state; unset RATCHET_AGENT for the main caller, or set it to scribe.)'
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Command table.
 // ---------------------------------------------------------------------------
 
@@ -118,18 +153,37 @@ function run(argv) {
       return out(`ratchet ${VERSION}`);
 
     case 'init': {
+      // `init --force` resets the store — a canonical mutation. Plain init only
+      // ensures the dir exists, so a propose-only agent may still orient.
+      if (flags.has('--force')) assertMayWrite('init --force');
       const res = state.initProject(cwd, { force: flags.has('--force') });
       return out(`Ratchet initialized at ${res.dir}${res.created ? '' : ' (already existed)'}`);
     }
 
     case 'state':
-      return cmdState(cwd, sub, rest, asJson);
+      return cmdState(cwd, sub, rest, asJson, flags);
+
+    case 'receipt': {
+      const r = receipt.assemble(cwd);
+      // --save writes the source-of-truth index: one always-current file a cold
+      // agent can read instead of doing archaeology. Derived + regenerable, so it
+      // is not a canonical-state write (propose-only agents may refresh it).
+      if (flags.has('--save')) {
+        const dir = path.join(cwd, '.ratchet');
+        fs.mkdirSync(dir, { recursive: true });
+        fs.writeFileSync(path.join(dir, 'current.json'), JSON.stringify(r, null, 2) + '\n', 'utf8');
+        fs.writeFileSync(path.join(dir, 'current.md'), md.receipt(r) + '\n', 'utf8');
+        if (!asJson) out(`saved .ratchet/current.json + .ratchet/current.md`);
+      }
+      return out(asJson ? JSON.stringify(r, null, 2) : md.receipt(r));
+    }
 
     case 'ledger':
       return cmdLedger(cwd, sub, rest, asJson);
 
     case 'artifact': {
       if (sub !== 'add') throw new Error('usage: ratchet artifact add <json>');
+      assertMayWrite('artifact add');
       const rec = artifacts.addArtifact(cwd, readPayload(rest[0]));
       return out(`artifact ${rec.id} added: ${rec.title} (${rec.status})`);
     }
@@ -167,6 +221,7 @@ function run(argv) {
 
     case 'compile': {
       if (sub !== 'done') throw new Error('usage: ratchet compile done');
+      assertMayWrite('compile done');
       return cmdCompileDone(cwd);
     }
 
@@ -177,6 +232,7 @@ function run(argv) {
     case 'touch': {
       const file = sub;
       if (!file) throw new Error('usage: ratchet touch <file>');
+      assertMayWrite('touch');
       const s = state.loadState(cwd);
       s.touchedFiles.push({ path: file, at: schemas.nowIso() });
       s.dirty = true;
@@ -194,7 +250,7 @@ function run(argv) {
   }
 }
 
-function cmdState(cwd, sub, rest, asJson) {
+function cmdState(cwd, sub, rest, asJson, flags = new Set()) {
   switch (sub) {
     case undefined:
     case 'get': {
@@ -207,6 +263,7 @@ function cmdState(cwd, sub, rest, asJson) {
       return out(asJson ? JSON.stringify(s, null, 2) : md.stateSummary(s));
     }
     case 'set': {
+      assertMayWrite('state set');
       const [key, ...valueParts] = rest;
       if (!key) throw new Error('usage: ratchet state set <key> <value>');
       if (!schemas.STATE_SCALARS.has(key)) {
@@ -221,6 +278,7 @@ function cmdState(cwd, sub, rest, asJson) {
       return out(`${key} set`);
     }
     case 'append': {
+      assertMayWrite('state append');
       const [collection, payloadArg] = rest;
       if (!schemas.STATE_COLLECTIONS[collection]) {
         throw new Error(`unknown collection "${collection}". valid: ${Object.keys(schemas.STATE_COLLECTIONS).join(', ')}`);
@@ -234,6 +292,17 @@ function cmdState(cwd, sub, rest, asJson) {
       return out(`appended to ${collection}: ${record.id}`);
     }
     case 'reset': {
+      assertMayWrite('state reset');
+      // Authority gate: wiping session state (objective, defects, artifacts,
+      // decisions, history) is irreversible. Like every other irreversible verb
+      // in the CLI, it must be explicitly authorized — a bare `state reset` must
+      // not be able to erase the record by accident.
+      if (!flags.has('--force')) {
+        throw new Error(
+          'ratchet state reset wipes all session state (objective, defects, artifacts, decisions, history) — ' +
+            'this is irreversible. Re-run with --force to authorize.'
+        );
+      }
       state.initProject(cwd, { force: true });
       return out('state reset');
     }
@@ -245,10 +314,12 @@ function cmdState(cwd, sub, rest, asJson) {
 function cmdLedger(cwd, sub, rest, asJson) {
   switch (sub) {
     case 'create': {
+      assertMayWrite('ledger create');
       const l = ledger.create(cwd);
       return out(`ledger ready (${md.dash(l.updatedAt)})`);
     }
     case 'update': {
+      assertMayWrite('ledger update');
       const [collection, payloadArg] = rest;
       const res = ledger.upsert(cwd, collection, readPayload(payloadArg));
       return out(`${res.action} ${collection}: ${res.item.id}`);
@@ -281,6 +352,9 @@ function cmdDefect(cwd, argv, asJson) {
     if (!val) throw new Error(msg);
     return val;
   };
+
+  // Read verbs (list/get) are open to every agent; the mutating verbs are not.
+  if (sub && sub !== 'list' && sub !== 'get') assertMayWrite(`defect ${sub}`);
 
   switch (sub) {
     case 'add': {
@@ -346,6 +420,7 @@ function cmdDefect(cwd, argv, asJson) {
 // reason (proof-gate spirit: never retract silently); --superseded-by links the
 // replacement so provenance survives.
 function cmdRetract(cwd, argv) {
+  assertMayWrite('retract');
   const { positionals, opts } = parseArgv(argv, {});
   const id = positionals[1];
   if (!id) throw new Error('usage: ratchet retract <artifact-id> --reason "<why>" [--superseded-by <id>]');
@@ -364,11 +439,22 @@ function cmdScore(cwd, sub, rest, asJson) {
     }
     case 'confidence': {
       const s = state.loadState(cwd);
-      const c = scoring.scoreConfidence(s);
-      if (asJson) return out(JSON.stringify(c, null, 2));
-      s.confidence = c.score;
-      state.saveState(cwd, s);
-      return out(md.confidence(s));
+      const ledger = state.loadLedger(cwd);
+      let events = [];
+      try {
+        events = journal.readEvents(cwd);
+      } catch (_e) {
+        events = [];
+      }
+      const layers = scoring.scoreConfidenceLayers(s, ledger, events);
+      if (asJson) return out(JSON.stringify(layers, null, 2));
+      // Cache the session score back into state (a write). A propose-only agent
+      // still gets the read — it just leaves no footprint.
+      if (!proposeOnlyAgent()) {
+        s.confidence = layers.session.score;
+        state.saveState(cwd, s);
+      }
+      return out(md.confidenceLayers(layers));
     }
     case 'aperture': {
       const result = scoring.scoreAperture(readPayload(rest[0]));
@@ -608,6 +694,10 @@ function help() {
     [
       `ratchet ${VERSION} — consequence-engine state tooling`,
       '',
+      'RESUME',
+      '  ratchet receipt [--json] [--save] one stable cockpit: target·delta·proof·verdict·risk·authority·state·next',
+      '                                    --save writes .ratchet/current.json + .md (the source-of-truth index)',
+      '',
       'STATE',
       '  ratchet init [--force]              create/reset project data dir',
       '  ratchet status [--json]            render current state',
@@ -615,7 +705,7 @@ function help() {
       '  ratchet state set <key> <value>    set objective|title|bottleneck|phase|nextAction|nextCommand|...',
       '  ratchet state append <coll> <json> append to decisions|artifacts|defects|assumptions|openLoops|history',
       '  ratchet compile done               mark session compiled: clear dirty + stamp lastCompileAt',
-      '  ratchet state reset                wipe session state',
+      '  ratchet state reset --force        wipe session state (irreversible — --force required)',
       '',
       'ARTIFACTS & DEFECTS',
       '  ratchet artifact add <json>        record an artifact ({title,kind,status,path,holes})',
@@ -635,7 +725,7 @@ function help() {
       '',
       'SCORING',
       '  ratchet score friction <json>      rank obstacles ([{name,leverage,certainty,speed,risk}])',
-      '  ratchet score confidence           compute session confidence + loop-clear',
+      '  ratchet score confidence           three scoped layers: artifact · session · ledger health',
       '  ratchet score aperture <json>      meter loop depth from uncertainty ({ambiguity,terrain,taste,blastRadius,reversibility} 0-2)',
       '',
       'CONTEXT',
@@ -649,6 +739,11 @@ function help() {
       '  ratchet doctor cold-start [--json] scan for stale steering (opt-in surfaces via .ratchet/cold-start.json)',
       '',
       'json args accept a raw string, @file, or - for stdin.',
+      '',
+      'AGENT MEMORY (isolation by role)',
+      '  RATCHET_AGENT=<name>  identify the driving agent. Only the scribe writes canonical',
+      '                        state; builder/auditor are propose-only — mutating verbs are',
+      '                        refused so they emit the command instead of clobbering the record.',
     ].join('\n')
   );
 }

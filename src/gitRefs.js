@@ -66,6 +66,10 @@ function statusRefs(cwd = process.cwd()) {
   const remoteContains = safeGit(['branch', '-r', '--contains', 'HEAD'], cwd);
   const remoteContainsHead = Boolean(remoteContains && remoteContains.trim());
 
+  // Tags pointing at HEAD — the signal for "released" in the authority ladder.
+  const tagsRaw = safeGit(['tag', '--points-at', 'HEAD'], cwd);
+  const headTags = tagsRaw ? tagsRaw.split('\n').map((t) => t.trim()).filter(Boolean) : [];
+
   return {
     isRepo: true,
     branch,
@@ -75,6 +79,7 @@ function statusRefs(cwd = process.cwd()) {
     comparisons,
     unpushed,
     remoteContainsHead,
+    headTags,
   };
 }
 

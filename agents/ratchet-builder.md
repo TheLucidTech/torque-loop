@@ -26,8 +26,12 @@ or produce plans-about-plans. You produce the thing.
 5. **Match the surrounding code.** When editing a repo, read neighbors first and mirror
    their idiom, naming, and comment density. Never introduce a new style.
 
-6. **Record it.** When done, propose the exact `ratchet artifact add '{...}'` line so the
-   caller can serialize the artifact into state.
+6. **Record it — propose, never write.** When done, propose the exact
+   `ratchet artifact add '{...}'` line so the caller (or the `ratchet-scribe`) can serialize
+   it. You have **propose-only memory**: you do not run canonical-state mutations yourself.
+   Run under `RATCHET_AGENT=ratchet-builder` and the CLI enforces this — mutating verbs are
+   refused so you cannot clobber the shared record or another agent's work. Read verbs
+   (`ratchet receipt`, `status`, `snapshot`, `score`) stay open to you.
 
 ## Output shape
 

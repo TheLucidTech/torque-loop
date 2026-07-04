@@ -43,6 +43,9 @@ function stateSummary(state) {
   lines.push(`- **Next action:** ${dash(state.nextAction)}`);
   lines.push(`- **Next command:** ${dash(state.nextCommand)}`);
   if (stale) lines.push(`- ⚠️ **Stale:** work changed since last compile — run \`/ratchet:compile\`.`);
+  // The confidence figure above is scoped to recorded state, not code
+  // correctness — say so, so the summary never reads as a ship-readiness claim.
+  if (conf.scope) lines.push(`- _Confidence scope: ${conf.scope}._`);
   return lines.join('\n');
 }
 
@@ -67,6 +70,10 @@ function friction(result) {
       out.push(`Beats runner-up "${result.runnerUp.name}" (${result.runnerUp.priority}) by ${result.margin}.`);
     }
   }
+  if (result.scope) {
+    out.push('');
+    out.push(`_Scope: ${result.scope}._`);
+  }
   return out.join('\n');
 }
 
@@ -87,7 +94,37 @@ function confidence(state) {
       ? '**Loop may stop:** no critical/high debt, no untested assumption, next action defined.'
       : '**Loop must continue:** unresolved critical/high debt, untested assumptions, or missing next action.'
   );
+  if (c.scope) {
+    out.push('');
+    out.push(`_Scope: ${c.scope}._`);
+  }
   return out.join('\n');
+}
+
+// Three-layer confidence. Rendered as three independently-scoped scores so a
+// verified artifact never reads as "blocked" because of unrelated ledger debt —
+// the exact gaslighting a single blunt score used to produce.
+function confidenceLayers(layers) {
+  const o = [];
+  o.push('### Confidence — three layers, each scoped');
+  o.push('');
+  const render = (title, c) => {
+    if (!c) return;
+    const scoreStr = c.score == null ? '—' : `${c.score}/100`;
+    o.push(`**${title}: ${scoreStr} (${c.band})**`);
+    if (c.scope) o.push(`_Scope: ${c.scope}._`);
+    const reasons = c.reasons || (c.penalties ? c.penalties.map((p) => `${p.reason} (−${p.cost})`) : []);
+    for (const r of reasons || []) o.push(`- ${r}`);
+    if (c.layer === 'session' && typeof c.loopClear === 'boolean') {
+      o.push(`- loop ${c.loopClear ? 'may stop' : 'must continue'}`);
+    }
+    o.push('');
+  };
+  render('Artifact confidence', layers.artifact);
+  render('Session confidence', layers.session);
+  render('Ledger health', layers.ledger);
+  o.push('_The layers are independent: a verified patch stays high on artifact confidence even when ledger health is low._');
+  return o.join('\n');
 }
 
 // `○` = still draining confidence, `●` = terminal (resolved/waived/superseded).
@@ -106,6 +143,7 @@ function aperture(a) {
       : '**Implement:** NO — lock constraints and produce options first; do not build yet.'
   );
   o.push(`**Metered loop:** ${a.sequence.map((s) => `\`/ratchet:${s}\``).join(' → ')}`);
+  if (a.scope) o.push(`_Scope: ${a.scope}._`);
   return o.join('\n');
 }
 
@@ -223,4 +261,166 @@ function fullExport(state, ledger) {
   return out.join('\n');
 }
 
-module.exports = { stateSummary, friction, confidence, aperture, defectList, defectOne, gitStatusRefs, repoSnapshot, fullExport, dash, bullets };
+// The receipt — the ratchet cockpit. One stable shape, rendered the same way
+// every time: eight fixed sections in a fixed order, each ALWAYS present.
+// Emptiness is stated ("—"), never omitted — a section that sometimes disappears
+// would force the reader to wonder whether it is empty or missing, which is the
+// archaeology the receipt exists to end. SEAM lives inside PROOF (it is an
+// evidence-quality fact); RISK and the authority ladder are first-class.
+function receipt(r) {
+  const em = (v) => (v == null || v === '' ? '—' : v);
+  const conf = (c) => (c && c.score != null ? `${c.score}/100 (${c.band})` : c ? `— (${c.band})` : '—');
+  const o = [];
+  o.push('## Ratchet receipt');
+  o.push(
+    `_valid as of ${em(r.validAsOf)} · one read: target · delta · proof · verdict · risk · authority · state · next_`
+  );
+  o.push('');
+
+  // 1 — TARGET: what we are steering toward.
+  o.push('**TARGET**');
+  if (r.target.locked) {
+    o.push(`- Objective: ${em(r.target.objective)}`);
+    o.push(`- Bottleneck: ${em(r.target.bottleneck)}`);
+  } else {
+    o.push('- — not locked (run `/ratchet:lock`)');
+  }
+  if (r.target.evolveTarget && (r.target.evolveTarget.target || r.target.evolveTarget.goal)) {
+    o.push(`- Evolving: \`${em(r.target.evolveTarget.target)}\` — ${em(r.target.evolveTarget.goal)}`);
+  }
+  o.push('');
+
+  // 2 — DELTA: what changed since the last serialization.
+  o.push('**DELTA** _(changed since last compile)_');
+  if (r.delta.touched.length) {
+    o.push(`- Touched: ${r.delta.touched.map((f) => `\`${f}\``).join(', ')}`);
+  } else {
+    o.push('- — nothing touched since last compile');
+  }
+  if (r.delta.lastArtifact) {
+    o.push(`- Last artifact: ${em(r.delta.lastArtifact.title)} (${em(r.delta.lastArtifact.kind)}, ${em(r.delta.lastArtifact.status)})`);
+  }
+  o.push(`- Uncompiled work: ${r.delta.stale ? 'yes — run `/ratchet:compile`' : 'no'}`);
+  o.push('');
+
+  // 3 — PROOF: evidence, not assertion — including whether the seam justifies a ship.
+  o.push('**PROOF** _(evidence, not assertion)_');
+  if (r.proof.keep) {
+    const k = r.proof.keep;
+    o.push(`- KEEP \`${em(k.id)}\`: ${em(k.mutation)}`);
+    o.push(
+      `  - evidence: ${em(k.evidenceType)} · result: ${em(k.result)}${k.independent === false ? ' · ⚠ not independent' : ''}`
+    );
+    if (k.commands && k.commands.length) o.push(`  - commands: ${k.commands.map((c) => `\`${c}\``).join(', ')}`);
+    if (k.manualChecks && k.manualChecks.length) o.push(`  - checks: ${k.manualChecks.join('; ')}`);
+  } else {
+    o.push('- — no proven KEEP on record');
+  }
+  const seam = r.proof.seam || { present: false };
+  if (seam.present) {
+    o.push(`- Seam: tested \`${em(seam.testedSeam)}\` → ships \`${em(seam.shipSeam)}\``);
+    o.push(
+      `  - match: **${em(seam.seamMatch)}**${seam.independent === false ? ' · ⚠ not independent from builder method' : ''}${seam.proxyWarning ? ' · ⚠ proxy warning' : ''}`
+    );
+    if (seam.waiver && seam.waiver.by) o.push(`  - waived by ${em(seam.waiver.by)}: ${em(seam.waiver.reason)}`);
+  } else {
+    o.push('- Seam: — none declared (no evolve KEEP on a ship path yet)');
+  }
+  if (r.proof.shipDecision === 'cannot-justify') {
+    o.push('- ⚠ **Cannot justify ship decision** — evidence is proxy-only (seam is not exact and not waived).');
+  } else if (r.proof.shipDecision === 'justified') {
+    o.push('- Ship decision: justified by the evidence above.');
+  }
+  if (r.proof.resolvedWithEvidence.length) {
+    o.push(`- Defects cleared with proof: ${r.proof.resolvedWithEvidence.length}`);
+  }
+  o.push('');
+
+  // 4 — VERDICT: the loop verdict + three independently-scoped confidences.
+  o.push('**VERDICT**');
+  o.push(`- Loop: ${em(r.verdict.loop)}`);
+  o.push(`- Artifact confidence: ${conf(r.verdict.artifact)} — is this patch good?`);
+  o.push(
+    `- Session confidence: ${conf(r.verdict.session)} — ${r.verdict.session && r.verdict.session.loopClear ? 'loop may stop' : 'loop must continue'}`
+  );
+  o.push(`- Ledger health: ${conf(r.verdict.ledger)} — historical QA hygiene`);
+  o.push('- _Each score is scoped; a verified artifact stays high even when ledger health is low._');
+  o.push('');
+
+  // 5 — RISK: what must not be trusted yet.
+  o.push('**RISK** _(what must not be trusted yet)_');
+  if (r.risk && r.risk.length) {
+    for (const rk of r.risk.slice(0, 8)) o.push(`- ${em(rk.text)} _(${em(rk.from)})_`);
+    if (r.risk.length > 8) o.push(`- … and ${r.risk.length - 8} more`);
+  } else {
+    o.push('- — none recorded');
+  }
+  o.push('');
+
+  // 6 — AUTHORITY: how far this traveled + irreversible actions and their owners.
+  o.push('**AUTHORITY** _(irreversible actions need a named owner)_');
+  if (r.authority.authorityState) o.push(`- State: **${em(r.authority.authorityState.label)}**`);
+  const anyAuth =
+    r.authority.waivedDefects.length || r.authority.retractedArtifacts.length || r.authority.seamWaivers.length;
+  if (anyAuth) {
+    for (const w of r.authority.waivedDefects) o.push(`- waived defect \`${em(w.id)}\` by ${em(w.by)}: ${em(w.reason)}`);
+    for (const a of r.authority.retractedArtifacts) {
+      o.push(`- retracted \`${em(a.id)}\` (${em(a.title)}): ${em(a.reason)}${a.supersededBy ? ` → superseded by ${a.supersededBy}` : ''}`);
+    }
+    for (const sw of r.authority.seamWaivers) o.push(`- seam waiver \`${em(sw.id)}\` by ${em(sw.by)}: ${em(sw.reason)}`);
+  } else {
+    o.push('- No irreversible action taken; none pending.');
+  }
+  if (r.authority.enforced && r.authority.enforced.length) {
+    o.push(`- _Gates in force: ${r.authority.enforced.map((e) => e.split(' — ')[0]).join(' · ')}._`);
+  }
+  o.push('');
+
+  // 7 — STATE: what is true / safe / blocked right now.
+  o.push('**STATE** _(true / safe / blocked)_');
+  o.push(`- Phase: ${em(r.state.phase)}`);
+  if (r.state.openDefects.length) {
+    o.push(`- Open defects: ${r.state.openDefects.map((d) => `[${d.severity}] ${d.summary}`).slice(0, 5).join('; ')}`);
+  } else {
+    o.push('- Open defects: none');
+  }
+  o.push(`- Untested assumptions: ${r.state.untested} · open loops: ${r.state.openLoops}`);
+  if (r.state.git) {
+    const cmp = (r.state.git.comparisons || []).map((c) => `${c.base} +${c.ahead}/-${c.behind}`).join(', ') || '—';
+    o.push(`- Git: ${em(r.state.git.branch)} @ ${em(r.state.git.head)} — ${r.state.git.dirty ? 'dirty' : 'clean'} · vs ${cmp}`);
+  } else {
+    o.push('- Git: not a repository');
+  }
+  const cp = r.controlPlane || { ok: true, configured: false, failures: 0, warnings: 0, checks: [] };
+  const cpStatus = cp.failures ? 'FAIL' : cp.warnings ? 'WARN' : 'clean';
+  const cpScope = cp.configured ? 'generic + configured surfaces' : 'generic checks only';
+  o.push(`- Control-plane scan: ${cpStatus} (${cp.failures || 0} fail, ${cp.warnings || 0} warn · ${cpScope})`);
+  const controlFindings = (cp.checks || []).filter((c) => c.level === 'fail' || c.level === 'warn').slice(0, 5);
+  for (const c of controlFindings) {
+    o.push(`  - ${String(c.level || 'warn').toUpperCase()} ${em(c.name)}${c.detail ? ` — ${c.detail}` : ''}`);
+  }
+  if ((cp.failures || 0) + (cp.warnings || 0) > controlFindings.length) {
+    o.push(`  - … and ${(cp.failures || 0) + (cp.warnings || 0) - controlFindings.length} more control-plane finding(s)`);
+  }
+  o.push('');
+
+  // 8 — NEXT: the single next move.
+  o.push('**NEXT**');
+  if (r.next.action || r.next.command) {
+    o.push(`- Action: ${em(r.next.action)}`);
+    o.push(`- Command: ${em(r.next.command)}`);
+  } else {
+    o.push('- — undefined (a cold session has no first move; run `/ratchet:lock` or `/ratchet:ignite`)');
+  }
+  if (r.next.edge) o.push(`- Next edge: ${r.next.edge}`);
+
+  if (r.gaps && r.gaps.length) {
+    o.push('');
+    o.push('**OPEN LOOPS**');
+    for (const g of r.gaps) o.push(`- ${em(g.text)} — ${em(g.status)}`);
+  }
+
+  return o.join('\n');
+}
+
+module.exports = { stateSummary, friction, confidence, confidenceLayers, aperture, receipt, defectList, defectOne, gitStatusRefs, repoSnapshot, fullExport, dash, bullets };
