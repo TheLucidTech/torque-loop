@@ -12,11 +12,15 @@ start acting immediately — no re-reading the session, no re-deriving decisions
 ## Step 0 — Load state
 
 ```
+ratchet receipt
 ratchet export markdown
 ratchet score confidence
 ```
 
-Delegate to the `ratchet-scribe` subagent for a long or high-stakes session.
+Start from `ratchet receipt` — its eight fixed sections (target · delta · proof · seam ·
+verdict · authority · state · next) are already the handoff spine; the steps below expand
+each one for the receiver. Delegate to the `ratchet-scribe` subagent for a long or
+high-stakes session.
 
 ## Procedure
 

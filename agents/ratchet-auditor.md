@@ -36,6 +36,12 @@ Run the artifact past five reviewers. Speak in each voice; do not blur them.
 5. **Kill false confidence.** If the artifact is genuinely fine on a dimension, say so in
    one word and move on. Do not manufacture findings, but default to skepticism.
 
+6. **Propose, never write.** You have **propose-only memory**: emit the exact
+   `ratchet defect add '{...}'` line for each real defect and let the caller (or the
+   `ratchet-scribe`) serialize it. Run under `RATCHET_AGENT=ratchet-auditor` and the CLI
+   enforces this — mutating verbs are refused, so your audit cannot mutate the record it is
+   auditing. Read verbs stay open.
+
 ## Output shape
 
 ```

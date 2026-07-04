@@ -10,15 +10,21 @@ where the ratchet sits, so you resume instead of restart.
 
 ## Procedure
 
-Read the serialized state and render it:
+Lead with the **receipt** — one stable read that answers *what is true, what changed, what
+is safe, what is blocked, and what happens next* without transcript archaeology:
 
 ```
-ratchet status
+ratchet receipt
 ```
 
-Add the confidence read and repo ground-truth when useful:
+The receipt always shows the same eight sections in the same order — **target · delta ·
+proof · seam · verdict · authority · state · next** — so a cold human or agent can resume in
+under a minute. Emptiness is stated, never omitted.
+
+For the detailed state view or a specific read, add:
 
 ```
+ratchet status          # the full state summary
 ratchet score confidence
 ratchet snapshot repo
 ```
@@ -27,7 +33,8 @@ ratchet snapshot repo
 
 - **Current objective** — the locked target.
 - **Bottleneck** — the chosen blocker.
-- **Confidence** — score/100 + band, and whether the loop is clear to stop.
+- **Confidence** — three scoped layers (artifact · session · ledger health), so a verified
+  patch is never shown as blocked because of unrelated debt.
 - **Active / last artifact** — what exists now.
 - **Last decision** — the most recent commitment.
 - **Open defects** — unresolved failures, by severity.
@@ -37,7 +44,7 @@ ratchet snapshot repo
 
 ## Output contract
 
-Return the rendered state verbatim, then one line of interpretation:
+Return the rendered receipt verbatim, then one line of interpretation:
 
 ```
 READ: <one sentence — where the ratchet is and the single most useful next move>

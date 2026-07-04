@@ -297,6 +297,33 @@ builder's own search method is rejected as not independent.
 | `ratchet git status-refs` | Ahead/behind vs every base ref — each one named. |
 | `ratchet doctor cold-start` | Scan for stale steering (opt-in surfaces via `.ratchet/cold-start.json`). |
 
+### The receipt — one control surface (`ratchet receipt`)
+
+`ratchet receipt` is the cockpit: one stable read a cold human or agent can parse in under a
+minute, so state never lives only in the transcript. Eight fixed sections, same order every
+time, emptiness stated rather than omitted:
+
+```text
+TARGET · DELTA · PROOF · VERDICT · RISK · AUTHORITY · STATE · NEXT
+```
+
+- **PROOF** carries the KEEP evidence card and the seam (tested → ships). If the seam is a
+  proxy and not waived, it says **"Cannot justify ship decision"** out loud — proxy proof
+  never masquerades as ship proof.
+- **VERDICT** splits confidence into three independently-scoped layers so a verified patch is
+  never gaslit to *blocked* by unrelated debt:
+
+  | Layer | Answers | Scope |
+  | --- | --- | --- |
+  | Artifact confidence | Is *this* patch good? | the current artifact's own holes, attached defects, and verification evidence |
+  | Session confidence | Can the loop stop? | active open defects, untested assumptions, next action |
+  | Ledger health | Is the record clean? | historical open/stale defects and failing tests |
+
+- **AUTHORITY** names where the work sits on the ladder — `uncommitted → committed-local →
+  pushed → released` — plus every irreversible action's owner and the gates in force.
+- `ratchet receipt --save` writes `.ratchet/current.json` + `.ratchet/current.md` — the
+  always-current source-of-truth index a new agent reads first.
+
 ---
 
 ## How it works
@@ -316,10 +343,11 @@ The skills carry the reasoning; the CLI carries the state. A skill loads context
 the CLI, does its work, and writes the result back:
 
 ```bash
+ratchet receipt                    # one stable resume read: target·delta·proof·seam·verdict·authority·state·next
 ratchet status                     # what the ratchet knows right now
 ratchet snapshot repo              # cheap ground-truth read of the codebase
 ratchet score friction '[...]'     # rank obstacles: Leverage × Certainty × Time × Risk (1–10)
-ratchet score confidence           # session confidence + whether the loop may stop
+ratchet score confidence           # three scoped layers: artifact · session · ledger health
 ratchet artifact add '{...}'       # record an artifact
 ratchet defect add '{...}'         # record a defect (also lands in the QA ledger)
 ratchet export markdown            # the full compile / handoff
@@ -332,6 +360,13 @@ Run `ratchet --help` for the complete surface.
 - **`ratchet-builder`** — produces the smallest usable artifact; refuses to deliberate.
 - **`ratchet-auditor`** — attacks artifacts, assumptions, and self-serving reasoning.
 - **`ratchet-scribe`** — serializes state, decisions, defects, and next moves.
+
+**Memory isolation by role.** The registered agents have isolated memory enforced at the CLI
+boundary: only the scribe writes canonical state. Builder and auditor are *propose-only* —
+run under `RATCHET_AGENT=<name>`, their mutating verbs are refused, so they emit the exact
+`ratchet …` command for the caller (or the scribe) to run instead of clobbering the shared
+record. Read verbs (`ratchet receipt`, `status`, `snapshot`, `score`) stay open to every
+agent. One writer, many proposers — agents cannot overwrite each other's memory.
 
 ### The hooks (conservative by design)
 
