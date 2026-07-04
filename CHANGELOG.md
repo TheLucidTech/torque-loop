@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-07-04 — Receipt
+
+0.2 gated proof; 0.3 gated the *seam* of that proof; 0.4 metered the *depth* of the loop.
+0.5 gives the loop a single cockpit: **one read — `ratchet receipt` — that says what is
+true, what changed, what was proven, what is at risk, whether it is safe to ship, and
+whether the receipt's own steering can be trusted.**
+
+### Added
+
+- **The receipt (`ratchet receipt`)** — one stable, always-same-shape read with eight fixed
+  sections (TARGET · DELTA · PROOF · VERDICT · RISK · AUTHORITY · STATE · NEXT), joining session
+  state, the evolve journal, the QA ledger, and git. Emptiness is stated, never omitted, so the
+  shape never shifts between commands or sessions. `--json` emits the same structure for
+  consumers; `--save` writes `.ratchet/current.json` + `current.md` as a gitignored
+  source-of-truth index.
+- **Three-layer confidence** — `ratchet score confidence` scores artifact · session · ledger
+  independently, each naming its scope. A verified artifact stays ship-ready even when unrelated
+  debt tanks session confidence — killing the "verified green but reported blocked" gaslight.
+- **Cold-start control-plane scan** — the receipt runs the cold-start poison scan inline and
+  renders `Control-plane scan: FAIL|WARN|clean` under STATE (also exposed as a top-level
+  `controlPlane` field in `--json`), surfacing stale steering (retracted work still being pointed
+  at) and misleading configured operator surfaces (e.g. unqualified git counts) in the one cold
+  read — no separate doctor run. Project surfaces are an opt-in adapter declared in
+  `.ratchet/cold-start.json`; no workspace path is hardcoded.
+
+### Changed
+
+- **`state reset` now requires `--force`** — an ungated canonical wipe is refused; the receipt
+  AUTHORITY card renders the gates in force.
+- **Agents are propose-only** — only the scribe writes canonical state; the builder and auditor
+  are refused mutating verbs at the CLI boundary via `RATCHET_AGENT` (they read and propose).
+
 ## [0.4.0] - 2026-07-03 — Aperture
 
 0.2 gated proof; 0.3 gated the *seam* of that proof. 0.4 adds the dial that decides how
