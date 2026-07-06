@@ -139,7 +139,7 @@ function scoreConfidence(state) {
     // recorded pressure, not correctness. A high score on an empty ledger means
     // "nothing is recorded as wrong," never "the code is right."
     scope:
-      'the active loop — open defects, untested assumptions, open loops, and whether objective/next-action are set. Whether the loop may stop, not whether any one patch is good',
+      'recorded loop pressure, not correctness — open defects, untested assumptions, open loops, and whether objective/next-action are set. Whether the loop may stop, not whether any one patch is good; unrecorded fog is invisible to it',
   };
 }
 

@@ -147,7 +147,10 @@ then walk four quadrants in order, naming the current one:
    assumption separately and say you will treat it as true until I correct it.
 2. Known unknowns — ask ONE question at a time, widest-impact first. Give lettered options
    with a recommended answer so I react in a few characters. Close each by:
-   user answer | territory (you researched it, show question + finding) | OPEN (+ what unblocks it).
+   user answer | territory (you researched it, show question + finding) | probe (a time-boxed
+   throwaway build whose only durable output is the finding — probe code dies, probe findings
+   live) | OPEN (+ what unblocks it AND the route that will close it: ask-user, probe,
+   park with owner, assumption + kill test, or defect).
 3. Unknown knowns — surface my tacit taste and context. Don't make me imagine it; put
    something concrete in front of me to react to (sample data, a throwaway mock, competing
    design directions). Record what each reaction reveals.

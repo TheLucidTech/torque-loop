@@ -96,6 +96,21 @@ function assemble(cwd = process.cwd()) {
   const openLoops = (s.openLoops || []).filter((l) => l.status !== 'closed');
   const stale = Boolean(s.dirty && (!s.lastCompileAt || s.lastCompileAt < s.updatedAt));
 
+  // FOG — build-for-learn state, cold-start-safe: live unknown-maps with their
+  // OPEN item counts (their holes), fog loops the aperture recorded but no map
+  // answered, and probes split live (residue) / disposed (completed).
+  const probeArts = artifactsArr.filter((a) => a.kind === 'probe');
+  const fog = {
+    maps: liveArtifacts
+      .filter((a) => a.kind === 'unknown-map')
+      .map((a) => ({ id: a.id, title: a.title, openItems: Array.isArray(a.holes) ? a.holes.length : 0 })),
+    fogLoops: openLoops.filter((l) => /^fog:/i.test(String(l.text || ''))).length,
+    probes: {
+      live: probeArts.filter((a) => a.status !== 'retracted' && a.status !== 'superseded').length,
+      disposed: probeArts.filter((a) => a.status === 'retracted' || a.status === 'superseded').length,
+    },
+  };
+
   // PROOF — the evidence card for the most recent KEEP, plus defects cleared
   // with recorded proof. The KEEP gate already guarantees this data exists for a
   // kept mutation; the receipt just makes it a first-class card.
@@ -232,6 +247,7 @@ function assemble(cwd = process.cwd()) {
       openDefects: openDefects.map((d) => ({ severity: d.severity, summary: d.summary })),
       untested: untested.length,
       openLoops: openLoops.length,
+      fog,
       dirty: Boolean(s.dirty),
       stale,
       git:

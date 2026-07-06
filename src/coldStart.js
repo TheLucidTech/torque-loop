@@ -151,12 +151,46 @@ function scan(cwd = process.cwd()) {
   if (nextAction) add('next action is set', 'ok');
   else add('next action is set', 'warn', 'no next action — a cold session has no first move');
 
+  // A retracted probe is a COMPLETED build-for-learn — its code died on purpose
+  // and its findings live elsewhere in state. Only non-probe retractions are
+  // dead steering; the live probe is the anomaly (checked below).
   const lastArtifact = artifacts[artifacts.length - 1];
-  if (lastArtifact && (lastArtifact.status === 'retracted' || lastArtifact.status === 'superseded')) {
+  if (
+    lastArtifact &&
+    (lastArtifact.status === 'retracted' || lastArtifact.status === 'superseded') &&
+    lastArtifact.kind !== 'probe'
+  ) {
     add('steering artifact is live', 'fail',
       `the most recent artifact "${lastArtifact.title}" is ${lastArtifact.status} — it will steer the next session toward dead work`);
   } else {
     add('steering artifact is live', 'ok');
+  }
+
+  // Fog gate: probes are build-for-learn — the code must die (retract) or be
+  // explicitly promoted. A probe still live at cold start is residue the next
+  // session could mistake for kept work.
+  const liveProbes = artifacts.filter(
+    (a) => a.kind === 'probe' && a.status !== 'retracted' && a.status !== 'superseded'
+  );
+  if (liveProbes.length) {
+    add('probe code is disposed or promoted', 'warn',
+      `${liveProbes.length} live probe artifact(s) (${liveProbes.map((a) => a.id).join(', ')}) — probe code is not kept work; retract it (disposed/promoted) before it ships by inertia`);
+  } else {
+    add('probe code is disposed or promoted', 'ok');
+  }
+
+  // Fog the dial recorded but nothing mapped: steering that says "build" while a
+  // fog loop is open is exactly the confident-build-into-fog the aperture refused.
+  const openFog = (s.openLoops || []).filter(
+    (l) => l.status !== 'closed' && /^fog:/i.test(String(l.text || ''))
+  );
+  // \bbuild\b, not /build/: "rebuild trust" is not build steering.
+  const steering = `${s.nextCommand || ''} ${s.nextAction || ''}`;
+  if (openFog.length && /\bbuild\b/i.test(steering)) {
+    add('build steering has no unmapped fog', 'fail',
+      `steering says build while ${openFog.length} fog loop(s) are open — run /ratchet:map (or close the fog with evidence) first`);
+  } else {
+    add('build steering has no unmapped fog', 'ok');
   }
 
   const steeredToDead = retracted.filter(

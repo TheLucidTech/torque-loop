@@ -40,6 +40,10 @@ to skim past:
 9. **Deviations from the map** — if `/ratchet:map` ran, where the build diverged from its
    plan (map said X → code revealed Y → call made) and which calls still need the user's
    judgment. This is what stops the receiver from re-litigating what you already discovered.
+10. **Probe outcomes** — for each probe: the unknown it attacked, the finding, and whether
+    its code was **disposed** or explicitly **promoted**. An undisposed probe is a
+    watch-out, not an asset — the receiver must not mistake build-for-learn residue for
+    kept work.
 
 ## Rules
 
@@ -61,6 +65,7 @@ NEXT ACTION: <the single concrete first move>
 CONTEXT TO ACT: <files / commands / facts, by location>
 WATCH-OUTS: <traps>
 DEVIATIONS: <map said X → code revealed Y → call made> (each, if a map ran)
+PROBES: <unknown → finding → disposed | promoted> (each, if any ran)
 NEXT COMMAND: /ratchet:<command>
 ```
 

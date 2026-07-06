@@ -48,7 +48,10 @@ the moment you hit them; never close a quadrant off-screen.
    question first (the answer that reshapes the most), not a wall of them. Give lettered
    options with a **recommended** answer. Close each question exactly one way, in front of
    the user: **user answer**, **territory** (you researched it, then show question +
-   finding), or **OPEN** (deferred, with what would unblock it).
+   finding), **probe** (only touching the repo can answer it — commission a probe card,
+   below), or **OPEN** (deferred, with what would unblock it *and the route that will close
+   it*: ask-user, probe, park with owner+reason, promote to an assumption with a kill test,
+   or a defect).
 
 3. **Unknown knowns — extract the tacit.** The user cannot articulate what they don't know
    they know. Do not ask abstractly. Put something concrete in their hands — sample data, a
@@ -70,10 +73,46 @@ the moment you hit them; never close a quadrant off-screen.
 
 5. **Hand over the map.** One page, all four quadrants — shape it like
    `templates/unknowns-map.md` and write it to `.ratchet/unknowns-map.md`. OPEN items live
-   **on the map**, not buried in chat. Add a tweakable build plan ordered by *what might
-   change* (judgment calls first, routine work compressed at the bottom) and a copy-paste
-   implementation prompt. Then stop — implementation is a separate engagement. The map stays
-   live through the build: `/ratchet:build` records deviations back onto it.
+   **on the map**, not buried in chat — and every OPEN item names its route out (ask-user,
+   probe, park with owner+reason, assumption+killTest, or defect). An OPEN item with no
+   route is a stall with a receipt, not mapped fog. Add a tweakable build plan ordered by
+   *what might change* (judgment calls first, routine work compressed at the bottom) and a
+   copy-paste implementation prompt. Then stop — implementation is a separate engagement.
+   The map stays live through the build: `/ratchet:build` records deviations back onto it.
+
+## Probes — when the map must touch (build-for-learn)
+
+Some fog only appears by touching: an unknown unknown no read can surface, a taste no
+question can extract. For those, do not ask harder — commission a **probe**: a time-boxed,
+reversible, throwaway build whose proof-of-done is knowledge, not code. Shape it like
+`templates/probe-card.md`:
+
+```
+PROBE: <the unknown this closes>
+- Hypothesis: <what touching should show>
+- Smallest reversible touch: <mock | spike | failing test | fixture | instrumentation>
+- Allowed surfaces: <files it may touch — nothing else>
+- Proof of learning: <the observation that closes the unknown, either way>
+- Stop condition: <time-box / attempt cap>
+```
+
+**Probe code dies; probe findings live.** Serialize the lifecycle:
+
+```
+ratchet artifact add '{"kind":"probe","title":"probe: <unknown>","status":"v0","holes":["disposal: pending"]}'
+# run it via /ratchet:build in build-for-learn mode, then — findings first, then dispose:
+ratchet state append decisions '{"choice":"<what it settled>","rejected":"<losing hypothesis>","tripwire":"<what reopens it>"}'
+ratchet retract <probe-id> --reason "disposed: code reverted; finding recorded as <id>"
+```
+
+The `disposal: pending` hole drains confidence until the probe is retracted, and the
+cold-start scan flags a live probe as residue — undisposed probe code cannot read clean.
+If probe code turns out worth keeping, that is a **promotion**: a fresh `/ratchet:build`
+under the full proof/seam gates, then `ratchet retract <probe-id> --reason "promoted: <the
+keep-build>" --superseded-by <new-artifact-id>`. The CLI enforces both: a probe retraction
+must start `disposed:` or `promoted:`, and a promotion must name its superseder. Nothing
+ships because a probe happened to leave it behind. An unfinished probe (stop condition
+hit) closes its item as OPEN with what it *did* learn.
 
 ## Output contract
 
@@ -85,7 +124,10 @@ KNOWN KNOWNS:
 - <assumption> — treated as true until challenged
 
 KNOWN UNKNOWNS:
-- Q: <question> | recommend: <lettered answer> | closed by: user | territory | OPEN | unblocks: <what>
+- Q: <question> | recommend: <lettered answer> | closed by: user | territory | probe | parked(owner) | OPEN + route | unblocks: <what>
+
+PROBES (if any commissioned):
+- probe: <unknown> | hypothesis: <expected> | touch: <smallest reversible> | stop: <time-box>
 
 UNKNOWN KNOWNS:
 - tacit constraint: <extracted> | reshaped the target: <how>
@@ -119,6 +161,11 @@ ratchet defect add '{"severity":"high","summary":"<landmine that will bite the b
 The map's OPEN loops, untested assumptions, and artifact holes all drain
 `ratchet score confidence` on purpose — an unclosed unknown is tracked pressure, not a
 forgotten one. The score cannot read ship-ready while the fog is still on the board.
+
+The CLI holds both ends of the fog loop itself: `ratchet score aperture` records
+`fog: pre-build map required` as an open loop the moment `mapRequired` fires (writer
+callers), and `ratchet artifact add` with `kind:"unknown-map"` closes it when the map
+lands — scored fog can never live only on stdout.
 
 ## Meter — when to reach for this
 

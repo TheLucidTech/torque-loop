@@ -82,6 +82,12 @@ const LEDGER_COLLECTIONS = {
 };
 
 const SEVERITIES = ['critical', 'high', 'medium', 'low', 'info'];
+
+// The fog loop's text prefix. One constant, two ends of the lifecycle: the CLI
+// opens a loop with this prefix when `score aperture` raises mapRequired, and
+// artifacts.addArtifact closes loops with this prefix when the unknown-map
+// lands. Shared so the open and close can never drift apart.
+const FOG_LOOP_PREFIX = 'fog: pre-build map required';
 const PHASES = ['idle', 'lock', 'auction', 'cut', 'build', 'attack', 'patch', 'compile', 'loop'];
 
 // Defect lifecycle. `open`/`patched`/`reopened` are still-live pressure and
@@ -100,6 +106,7 @@ module.exports = {
   STATE_SCALARS,
   LEDGER_COLLECTIONS,
   SEVERITIES,
+  FOG_LOOP_PREFIX,
   PHASES,
   DEFECT_STATUSES,
   DEFECT_TERMINAL_STATUSES,

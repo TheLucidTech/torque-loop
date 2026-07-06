@@ -155,4 +155,19 @@ ok('the living unknowns-map ships as templates and threads through build → han
   assert.ok(/deviation/i.test(read('skills/handoff/SKILL.md')), 'handoff surfaces map deviations');
 });
 
+ok('the probe primitive threads map → build → handoff with a disposal rule', () => {
+  // A probe is a build whose proof-of-done is knowledge, not code: the map can
+  // close an unknown by probe, build runs it as build-for-learn, handoff reports
+  // whether its code died or was explicitly promoted.
+  assert.ok(exists('templates/probe-card.md'), 'templates/probe-card.md exists');
+  assert.ok(/disposal/i.test(read('templates/probe-card.md')), 'the probe card carries a disposal rule');
+  const mapSkill = read('skills/map/SKILL.md');
+  assert.ok(/\bprobe\b/i.test(mapSkill), 'map can close an unknown by probe');
+  assert.ok(/park/i.test(mapSkill), 'map OPEN items can be parked with an owner');
+  assert.ok(/build-for-learn/i.test(read('skills/build/SKILL.md')), 'build distinguishes build-for-learn from build-for-keep');
+  assert.ok(/probe/i.test(read('skills/handoff/SKILL.md')), 'handoff surfaces probe outcomes');
+  assert.ok(/probe/i.test(read('reference/PROMPTS.md')), 'the prompt source of truth knows the probe closure');
+  assert.ok(/probe/i.test(read('templates/unknowns-map.md')), 'the map template offers probe as a closure');
+});
+
 process.stdout.write(`\n${passed} passed\n`);

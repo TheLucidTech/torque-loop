@@ -37,6 +37,12 @@ Speak in each voice distinctly. Do not blur them into generic "concerns".
   the contradicting case or mark the claim unproven.
 - **Name the smallest patch** each finding needs — REMOVE / ADD / CHANGE. You specify the
   delta; you do not apply it here.
+- **Flag fog, not just defects.** A finding that says the *premise* was wrong — a hidden
+  convention, wrong-by-default data, a claim that contradicts the locked target or the
+  unknowns-map — is fog the aperture missed, not merely a bug. Serialize it
+  (`ratchet state append assumptions ...` with a kill test, or an `openLoops` entry
+  prefixed `fog:`), and at two or more such findings recommend `/ratchet:map` before any
+  further patching: you are patching inside unmapped terrain.
 
 ## Output contract
 

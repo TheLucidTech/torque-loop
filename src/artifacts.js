@@ -18,9 +18,27 @@ function addArtifact(cwd, item) {
     status: item.status || 'v0',
     holes: Array.isArray(item.holes) ? item.holes : item.holes ? [item.holes] : [],
   };
+  // A probe's drain is an invariant, not a convention: build-for-learn code
+  // must cost confidence until disposed or promoted, even when the caller
+  // omits the hole.
+  if (record.kind === 'probe' && !record.holes.some((h) => /disposal:\s*pending/i.test(String(h)))) {
+    record.holes.push('disposal: pending');
+  }
   s.artifacts.push(record);
   s.dirty = true;
   s.history.push({ id: state.makeId('hist'), at: record.at, event: 'artifact.add', note: record.title });
+  // The map landing is the fog entering durable state: close the fog loop that
+  // `score aperture` opened, so the drain tracks reality instead of nagging past
+  // the point the map answered it. (The map's own OPEN items keep draining as
+  // this artifact's holes.)
+  if (record.kind === 'unknown-map') {
+    for (const l of s.openLoops || []) {
+      if (l.status !== 'closed' && String(l.text || '').startsWith(schemas.FOG_LOOP_PREFIX)) {
+        l.status = 'closed';
+        l.closedBy = record.id;
+      }
+    }
+  }
   state.saveState(cwd, s);
   return record;
 }
@@ -122,6 +140,19 @@ function retractArtifact(cwd, id, { reason = '', supersededBy = '' } = {}) {
   const s = state.loadState(cwd);
   const a = (s.artifacts || []).find((x) => x.id === id);
   if (!a) throw new Error(`no artifact with id "${id}"`);
+  // A probe retraction is its lifecycle exit and must state which one: the
+  // code died (disposed) or was explicitly rebuilt for keep (promoted). A
+  // vague reason would let residue stop draining without either outcome.
+  if (a.kind === 'probe') {
+    if (!/^(disposed|promoted):/i.test(reason)) {
+      throw new Error(
+        'a probe retraction must state its outcome: --reason must start with "disposed:" (code reverted, finding recorded) or "promoted:" (rebuilt for keep)'
+      );
+    }
+    if (/^promoted:/i.test(reason) && !supersededBy) {
+      throw new Error('a promoted probe requires --superseded-by <artifact-id> — the build-for-keep that replaced it');
+    }
+  }
   const now = schemas.nowIso();
   a.status = 'retracted';
   a.retracted = { at: now, reason, supersededBy, keptForProvenance: true };
