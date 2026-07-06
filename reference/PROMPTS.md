@@ -13,6 +13,7 @@ prompt is the load-bearing intent — fix the skill.
 | --- | --- |
 | `/ratchet:ignite` | Master Ignition Prompt (consequence engine) |
 | `/ratchet:lock` | 1 · The Target Is Not The Topic |
+| `/ratchet:map` | The Fog Map (four-quadrant unknowns walk) |
 | `/ratchet:auction` | 2 · The Friction Auction |
 | `/ratchet:cut` | 3 · The Assumption Guillotine |
 | `/ratchet:mechanism` | 4 · The Mechanism Knife |
@@ -120,6 +121,43 @@ Return exactly:
 Do not brainstorm.
 Do not offer options unless forced.
 Choose the target and make it operational.
+```
+
+---
+
+## The Fog Map  → `/ratchet:map`
+
+The pre-build twin of the target lock: where `/ratchet:lock` says *infer and move*, the
+Fog Map says *don't build on a high-blast-radius guess*. Run it when uncertainty earns it
+(aperture A3–A4, unfamiliar terrain, "know it when I see it" taste, a reference port).
+
+```text
+Map the fog before you build.
+
+Given this task and its codebase:
+
+[PASTE CONTEXT]
+
+Do not build yet. Scan the terrain first — existing, half-built, and reverted work —
+then walk four quadrants in order, naming the current one:
+
+1. Known knowns — state the settled ground, each fact cited to file:line. Mark every
+   assumption separately as "settled unless you say otherwise."
+2. Known unknowns — ask ONE question at a time, ordered by blast radius. Give lettered
+   options with a recommended answer so I react in a few characters. Close each by:
+   user answer | territory (you researched it, show question + finding) | OPEN (+ what unblocks it).
+3. Unknown knowns — surface my tacit taste and context. Don't ask me to imagine; hand me
+   something concrete to react to (sample data, a throwaway mock, competing design
+   directions). Record what each reaction reveals.
+4. Unknown unknowns — sweep for landmines: wrong-by-default data, stale denormalizations,
+   unwritten conventions, half-built or reverted prior attempts (and why they died), latent
+   bugs on this path. Each as a card: evidence (file:line) → why it bites → what it changes
+   → decided | OPEN | sharp-edge.
+
+Then hand over ONE page: the four-quadrant map (OPEN items stay on the map, not in chat),
+a tweakable build plan ordered by what might change, and a copy-paste implementation prompt.
+
+The map — not code — is the deliverable. Stop when I have it.
 ```
 
 ---

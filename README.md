@@ -187,6 +187,7 @@ when it isn't. In Codex, ask it to use the matching Torque Loop skill, for examp
 | --- | --- |
 | `/ratchet:ignite` | Run the full consequence loop on any messy task. |
 | `/ratchet:lock` | Convert vague input into a locked, executable target. |
+| `/ratchet:map` | Map the fog before building — walk the four unknown-quadrants, hand over a durable map. |
 | `/ratchet:auction` | Rank the real blockers by leverage; pick the one bottleneck. |
 | `/ratchet:cut` | Attack the hidden assumptions before you invest. |
 | `/ratchet:mechanism` | Name the one mechanism under a confusing situation. |
@@ -200,6 +201,14 @@ when it isn't. In Codex, ask it to use the matching Torque Loop skill, for examp
 | `/ratchet:compile` | Serialize the session into durable state. |
 | `/ratchet:status` | Read the current ratchet state. |
 | `/ratchet:loop` | Repeat build → attack → patch → compile until it holds. |
+
+> **When to reach for `/ratchet:map`.** High-uncertainty work — aperture **A3–A4**,
+> unfamiliar terrain, reference-implementation ports, or "I'll know it when I see it"
+> taste. Walk the four unknown-quadrants (known knowns · known unknowns · unknown knowns ·
+> unknown unknowns) and hand over the map *before* `/ratchet:build`; at **A4**, stop after
+> the map until constraints are locked. The map, not code, is the deliverable — the
+> unknown found before code costs minutes; the same unknown found three PRs later costs the
+> three PRs.
 
 ### Specialized
 
