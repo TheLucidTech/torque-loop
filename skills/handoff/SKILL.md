@@ -37,6 +37,9 @@ to skim past:
 7. **Context to act** — the minimum files, commands, or facts the receiver needs. Point to
    locations; don't paste the world.
 8. **Watch-outs** — the traps you already hit or foresee.
+9. **Deviations from the map** — if `/ratchet:map` ran, where the build diverged from its
+   plan (map said X → code revealed Y → call made) and which calls still need the user's
+   judgment. This is what stops the receiver from re-litigating what you already discovered.
 
 ## Rules
 
@@ -57,6 +60,7 @@ OPEN RISKS: <[severity] summary> (each)
 NEXT ACTION: <the single concrete first move>
 CONTEXT TO ACT: <files / commands / facts, by location>
 WATCH-OUTS: <traps>
+DEVIATIONS: <map said X → code revealed Y → call made> (each, if a map ran)
 NEXT COMMAND: /ratchet:<command>
 ```
 

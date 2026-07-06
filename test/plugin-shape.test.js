@@ -146,4 +146,13 @@ ok('the /ratchet:map fog gate is wired into the prompt catalog', () => {
   assert.ok(prompts.includes('/ratchet:map'), 'PROMPTS.md references /ratchet:map');
 });
 
+ok('the living unknowns-map ships as templates and threads through build → handoff', () => {
+  // The map is not a pre-build formality: it has a file shape, and it stays alive
+  // through the build as deviation notes that surface again at handoff.
+  assert.ok(exists('templates/unknowns-map.md'), 'templates/unknowns-map.md exists');
+  assert.ok(exists('templates/deviation-note.md'), 'templates/deviation-note.md exists');
+  assert.ok(/deviation/i.test(read('skills/build/SKILL.md')), 'build records map deviations');
+  assert.ok(/deviation/i.test(read('skills/handoff/SKILL.md')), 'handoff surfaces map deviations');
+});
+
 process.stdout.write(`\n${passed} passed\n`);
