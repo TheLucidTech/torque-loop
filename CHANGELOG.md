@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-07-06 — Fog Gate
+
+0.2 gated proof (*no proof → no keep*); 0.3 gated the *seam* of that proof
+(*wrong proof → no ship*); 0.4 metered the loop's *depth*; 0.5 gave it a *cockpit*.
+0.6 gates the **fog**: high-uncertainty work maps its unknowns before it builds —
+**no map → no confident build.** `/ratchet:map` walks the four unknown-quadrants
+(known knowns · known unknowns · unknown knowns · unknown unknowns), the aperture dial
+routes A3–A4 into it, and the map stays live through the build as deviation notes.
+
 ### Added
 
 - **`/ratchet:map` — the pre-build fog gate.** The loop had no pre-build ambiguity pass:
@@ -240,7 +249,9 @@ Initial public release.
 - Single-plugin marketplace manifest so the repo installs directly as a Claude Code plugin.
 - Zero-dependency smoke test suites for the state engine and the evolution helpers.
 
-[Unreleased]: https://github.com/TheLucidTech/torque-loop/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/TheLucidTech/torque-loop/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/TheLucidTech/torque-loop/compare/v0.5.0...v0.6.0
+[0.5.0]: https://github.com/TheLucidTech/torque-loop/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/TheLucidTech/torque-loop/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/TheLucidTech/torque-loop/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/TheLucidTech/torque-loop/compare/v0.1.0...v0.2.0
