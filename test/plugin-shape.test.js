@@ -137,4 +137,13 @@ ok('README does not mention removed command names', () => {
   assert.ok(!readme.includes('/ratchet:ratchet-evolve'), 'no stale /ratchet:ratchet-evolve in README');
 });
 
+ok('the /ratchet:map fog gate is wired into the prompt catalog', () => {
+  // The generic loops above already force skills/map to carry frontmatter and be
+  // listed in the README. PROMPTS.md sync is otherwise untested, so guard it here:
+  // the map skill exists AND its canonical intent lives in the prompt source of truth.
+  assert.ok(skillDirs.includes('map'), 'skills/map exists');
+  const prompts = read('reference/PROMPTS.md');
+  assert.ok(prompts.includes('/ratchet:map'), 'PROMPTS.md references /ratchet:map');
+});
+
 process.stdout.write(`\n${passed} passed\n`);
