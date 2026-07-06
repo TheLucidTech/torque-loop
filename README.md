@@ -206,8 +206,11 @@ when it isn't. In Codex, ask it to use the matching Torque Loop skill, for examp
 > unfamiliar terrain, reference-implementation ports, or "I'll know it when I see it"
 > taste. Walk the four unknown-quadrants (known knowns · known unknowns · unknown knowns ·
 > unknown unknowns) and hand over the map *before* `/ratchet:build`; at **A4**, stop after
-> the map until constraints are locked. What you deliver is the map, not a build — a wrong
-> assumption caught on the map is a one-line fix; caught mid-build it is a rewrite.
+> the map until constraints are locked. The aperture read raises **`Pre-build map:
+> required`** for exactly these cases — including a high-`taste` or unfamiliar-`terrain`
+> task the summed score would under-rate — so `/ratchet:ignite` routes into the map on its
+> own. What you deliver is the map, not a build — a wrong assumption caught on the map is a
+> one-line fix; caught mid-build it is a rewrite.
 
 ### Specialized
 

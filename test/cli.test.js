@@ -238,6 +238,38 @@ ok('aperture renders with its metered ratchet loop', () => {
   assert.ok(/ratchet:build/.test(out));
 });
 
+ok('aperture routes high-uncertainty work through /ratchet:map', () => {
+  // A3/A4 route through the pre-build fog gate, before build.
+  const wide = scoring.scoreAperture({ ambiguity: 2, terrain: 2, taste: 1, blastRadius: 1, reversibility: 1 }); // 7 → A3
+  assert.strictEqual(wide.level, 'A3');
+  assert.ok(wide.sequence.includes('map'), 'A3 sequence routes through map');
+  assert.ok(wide.sequence.indexOf('map') < wide.sequence.indexOf('build'), 'map comes before build');
+  assert.ok(wide.mapRequired, 'A3 requires a pre-build map');
+
+  const max = scoring.scoreAperture({ ambiguity: 2, terrain: 2, taste: 2, blastRadius: 2, reversibility: 2 }); // 10 → A4
+  assert.ok(max.sequence.includes('map'), 'A4 routes through map');
+  assert.ok(!max.sequence.includes('build'), 'A4 still produces options, not code');
+  assert.ok(max.mapRequired);
+
+  // The single-dimension override: "know it when I see it" taste warrants a map
+  // even when the summed score sits at A0.
+  const taste = scoring.scoreAperture({ ambiguity: 0, terrain: 0, taste: 2, blastRadius: 0, reversibility: 0 }); // 2 → A0
+  assert.strictEqual(taste.level, 'A0');
+  assert.ok(taste.mapRequired, 'high taste requires a map even at a low score');
+
+  // Unfamiliar terrain + any goal ambiguity, below the A3 band, still earns it.
+  const fog = scoring.scoreAperture({ ambiguity: 1, terrain: 2, taste: 0, blastRadius: 0, reversibility: 0 }); // 3 → A1
+  assert.ok(fog.mapRequired, 'unfamiliar terrain with ambiguity earns a map');
+
+  // Plain low-uncertainty work does not — the flag must not fire on everything.
+  const narrow = scoring.scoreAperture({ ambiguity: 1, terrain: 0, taste: 0, blastRadius: 1, reversibility: 1 }); // 3 → A1
+  assert.ok(!narrow.mapRequired, 'low-uncertainty work skips the map');
+
+  // The render surfaces the requirement, and stays quiet when it does not apply.
+  assert.ok(/Pre-build map:.*required/.test(md.aperture(wide)), 'render names the map requirement');
+  assert.ok(!/Pre-build map/.test(md.aperture(narrow)), 'render stays quiet when a map is not required');
+});
+
 ok('markdown render does not throw on populated state', () => {
   const out = md.stateSummary(state.loadState(cwd));
   assert.ok(out.includes('Ratchet state'));
