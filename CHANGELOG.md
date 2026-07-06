@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-07-06 — Probe Gate
+
 0.6 gated the fog: *no map → no confident build*. It left two holes: fog the dial named
 could live only on stdout (skipped maps leave no trace, so unrecorded uncertainty never
 drains confidence), and some fog cannot be mapped by reading or asking at all — it only
@@ -304,7 +306,8 @@ Initial public release.
 - Single-plugin marketplace manifest so the repo installs directly as a Claude Code plugin.
 - Zero-dependency smoke test suites for the state engine and the evolution helpers.
 
-[Unreleased]: https://github.com/TheLucidTech/torque-loop/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/TheLucidTech/torque-loop/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/TheLucidTech/torque-loop/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/TheLucidTech/torque-loop/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/TheLucidTech/torque-loop/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/TheLucidTech/torque-loop/compare/v0.3.0...v0.4.0
