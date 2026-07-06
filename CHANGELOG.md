@@ -20,8 +20,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   copy-paste implementation prompt before any code is written. CLI-backed
   (`artifact kind:"unknown-map"`, decisions, assumptions, open loops), so its open items
   drain `ratchet score confidence` until closed; no schema change. Method grafted from
-  dzhng/skills `explore-unknowns`, expressed in ratchet's own vocabulary. Aperture
-  auto-routing (scoring the task straight into the map) is deferred to a follow-up.
+  dzhng/skills `explore-unknowns`, expressed in ratchet's own vocabulary.
+- **Aperture routes through the map.** `ratchet score aperture` now folds `/ratchet:map`
+  into the A3–A4 metered sequences (before `build`) and returns a `mapRequired` flag —
+  true at A3+, or when a single dimension the summed score under-weights demands it
+  (`taste = 2`, or `terrain = 2` with any `ambiguity`). `md.aperture()` renders
+  **`Pre-build map: required`** so `/ratchet:ignite` routes high-uncertainty work through
+  the fog gate instead of relying on the operator to remember. A4 still builds nothing.
 
 ## [0.5.0] - 2026-07-04 — Receipt
 

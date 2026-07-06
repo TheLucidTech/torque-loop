@@ -49,8 +49,14 @@ The result names an aperture and the exact ratchet sequence to run:
 | A0 Snap | 0–2 | `build → verify` — do it, prove it, stop. |
 | A1 Narrow | 3–4 | `lock → build → verify → compile`. |
 | A2 Working | 5–6 | the full seven-step pipeline below. |
-| A3 Wide | 7–8 | add `auction` + `decide`; prototype / reference before build. |
-| A4 Max | 9–10 | `lock → cut → decide`, then **STOP — produce options, do not build** until constraints are locked. |
+| A3 Wide | 7–8 | `lock → map → auction → cut → decide → build …` — map the fog before you build. |
+| A4 Max | 9–10 | `lock → map → cut → decide`, then **STOP — produce options, do not build** until constraints are locked. |
+
+When the read reports **`Pre-build map: required`**, run `/ratchet:map` before any
+build step and hand over the four-quadrant map first. The dial raises it at A3–A4, and
+also on a single dominant dimension the score under-weights — "I'll know it when I see
+it" taste, or unfamiliar terrain with any goal ambiguity — so a high-taste task can earn
+a map even at a low overall score. At A4, stop after the map until constraints are locked.
 
 Widen one level after failed verification, a surprising repo constraint, or
 conflicting requirements; narrow one after the user locks a decision or the work

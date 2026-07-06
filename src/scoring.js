@@ -284,8 +284,8 @@ const APERTURE_LEVELS = [
   { max: 2, level: 'A0', name: 'Snap', implement: true, sequence: ['build', 'verify'] },
   { max: 4, level: 'A1', name: 'Narrow', implement: true, sequence: ['lock', 'build', 'verify', 'compile'] },
   { max: 6, level: 'A2', name: 'Working', implement: true, sequence: ['lock', 'cut', 'build', 'attack', 'patch', 'verify', 'compile'] },
-  { max: 8, level: 'A3', name: 'Wide', implement: true, sequence: ['lock', 'auction', 'cut', 'decide', 'build', 'attack', 'patch', 'compile'] },
-  { max: 10, level: 'A4', name: 'Max', implement: false, sequence: ['lock', 'cut', 'decide'] },
+  { max: 8, level: 'A3', name: 'Wide', implement: true, sequence: ['lock', 'map', 'auction', 'cut', 'decide', 'build', 'attack', 'patch', 'compile'] },
+  { max: 10, level: 'A4', name: 'Max', implement: false, sequence: ['lock', 'map', 'cut', 'decide'] },
 ];
 
 // A missing dimension defaults to 1 (neutral), never 0 — treating unknown
@@ -310,12 +310,21 @@ function scoreAperture(dims) {
     total += v;
   }
   const band = APERTURE_LEVELS.find((b) => total <= b.max) || APERTURE_LEVELS[APERTURE_LEVELS.length - 1];
+  // The pre-build fog gate (/ratchet:map) is earned by high overall uncertainty
+  // (A3+), OR by a single dimension the summed score under-weights: "know it when
+  // I see it" taste, or unfamiliar terrain paired with any goal ambiguity. Those
+  // can sit below the A3 band yet still make a confident build the wrong move — so
+  // the flag can fire even when the metered sequence for this band does not
+  // include `map`, signalling "map first anyway."
+  const mapRequired =
+    total >= 7 || scored.taste === 2 || (scored.terrain === 2 && scored.ambiguity >= 1);
   return {
     score: total, // 0..10
     level: band.level, // A0..A4
     name: band.name,
     implement: band.implement, // A4: do NOT build until constraints are locked
     sequence: band.sequence.slice(), // ratchet skills to run at this depth
+    mapRequired, // route through /ratchet:map before building (see above)
     dimensions: scored,
     // This reading is only valid for the task as scored, at scoring time.
     scope: 'the one task scored, at scoring time — re-score if the task or its constraints change',

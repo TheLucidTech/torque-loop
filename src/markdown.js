@@ -143,6 +143,9 @@ function aperture(a) {
       : '**Implement:** NO — lock constraints and produce options first; do not build yet.'
   );
   o.push(`**Metered loop:** ${a.sequence.map((s) => `\`/ratchet:${s}\``).join(' → ')}`);
+  if (a.mapRequired) {
+    o.push('**Pre-build map:** required — run `/ratchet:map` before `/ratchet:build`; map the fog first.');
+  }
   if (a.scope) o.push(`_Scope: ${a.scope}._`);
   return o.join('\n');
 }
