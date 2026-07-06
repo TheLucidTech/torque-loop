@@ -27,6 +27,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`taste = 2`, or `terrain = 2` with any `ambiguity`). `md.aperture()` renders
   **`Pre-build map: required`** so `/ratchet:ignite` routes high-uncertainty work through
   the fog gate instead of relying on the operator to remember. A4 still builds nothing.
+- **The map lives through the build.** New `templates/unknowns-map.md` (the four-quadrant
+  map's file shape, with a *Deviations during build* section) and `templates/deviation-note.md`
+  (map said X → code revealed Y → call made). `/ratchet:build` now builds *against* an existing
+  `unknown-map` artifact and records deviations as decisions/open-loops/defects instead of
+  silently absorbing them; `/ratchet:handoff` surfaces those deviations so the receiver never
+  re-litigates what the build already discovered.
 
 ## [0.5.0] - 2026-07-04 — Receipt
 

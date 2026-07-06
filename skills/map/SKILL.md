@@ -68,10 +68,12 @@ the moment you hit them; never close a quadrant off-screen.
    status: decided | OPEN | sharp-edge
    ```
 
-5. **Hand over the map.** One page, all four quadrants. OPEN items live **on the map**, not
-   buried in chat. Add a tweakable build plan ordered by *what might change* (judgment calls
-   first, routine work compressed at the bottom) and a copy-paste implementation prompt.
-   Then stop — implementation is a separate engagement.
+5. **Hand over the map.** One page, all four quadrants — shape it like
+   `templates/unknowns-map.md` and write it to `.ratchet/unknowns-map.md`. OPEN items live
+   **on the map**, not buried in chat. Add a tweakable build plan ordered by *what might
+   change* (judgment calls first, routine work compressed at the bottom) and a copy-paste
+   implementation prompt. Then stop — implementation is a separate engagement. The map stays
+   live through the build: `/ratchet:build` records deviations back onto it.
 
 ## Output contract
 

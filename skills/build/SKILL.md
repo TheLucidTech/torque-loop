@@ -40,6 +40,12 @@ Templates for records live in the plugin's `templates/` directory — mirror the
 4. **Write a 5-point working test.** Concrete pass/fail checks a stranger could run. If you
    cannot write the test, you do not yet understand the artifact — say so and narrow scope.
 
+**Build against the map.** If `/ratchet:map` left an `unknown-map` artifact
+(`.ratchet/unknowns-map.md`), build against it — and when the code contradicts what the map
+assumed, do not silently absorb it. Record a deviation (`templates/deviation-note.md`) as a
+`decision`, `openLoop`, or `defect`, and add it to the map's *Deviations during build*
+section. The map is a living record through the build, not a pre-build formality.
+
 For large or code-heavy artifacts, delegate to the `ratchet-builder` subagent.
 
 ## Output contract
@@ -61,6 +67,7 @@ EXPLICIT HOLES:
 
 ```
 ratchet artifact add '{"title":"<title>","kind":"<kind>","status":"v0","path":"<path or empty>","holes":["...","..."]}'
+ratchet state append openLoops '{"text":"deviation: map said X, code revealed Y — needs user judgment","status":"open"}'   # only if the build diverged from the map
 ratchet state set phase build
 ```
 
