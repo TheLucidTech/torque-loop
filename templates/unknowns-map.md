@@ -12,7 +12,11 @@
 ## Known unknowns — decision ledger
 | Question | Recommended | Closed by | Unblocks |
 | --- | --- | --- | --- |
-| <question> | <lettered answer> | user \| territory \| OPEN | <what it unblocks> |
+| <question> | <lettered answer> | user \| territory \| probe \| parked(owner) \| OPEN | <what it unblocks> |
+
+<Every OPEN row names its route out: ask-user, probe (card: templates/probe-card.md),
+park with owner+reason, promote to assumption+killTest, or defect. An OPEN item with no
+route is a stall with a receipt, not mapped fog.>
 
 ## Unknown knowns — extracted tacit context
 - <constraint surfaced by the user's reaction> — reshaped the target: <how>

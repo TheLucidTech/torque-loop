@@ -209,8 +209,13 @@ when it isn't. In Codex, ask it to use the matching Torque Loop skill, for examp
 > the map until constraints are locked. The aperture read raises **`Pre-build map:
 > required`** for exactly these cases — including a high-`taste` or unfamiliar-`terrain`
 > task the summed score would under-rate — so `/ratchet:ignite` routes into the map on its
-> own. What you deliver is the map, not a build — a wrong assumption caught on the map is a
-> one-line fix; caught mid-build it is a rewrite.
+> own, and it records that fog as an open loop so it drains confidence until the map lands.
+> What you deliver is the map, not a build — a wrong assumption caught on the map is a
+> one-line fix; caught mid-build it is a rewrite. When an unknown can only be answered by
+> touching the repo, the map commissions a **probe**: a time-boxed, reversible,
+> build-for-learn spike whose code dies and whose finding lives as a map delta
+> (`templates/probe-card.md`). Probe code never ships by inertia — keeping it requires an
+> explicit promotion through the normal proof/seam gates.
 
 ### Specialized
 

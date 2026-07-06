@@ -431,6 +431,35 @@ function cmdRetract(cwd, argv) {
   return out(`artifact ${id} retracted${supersededBy ? ` (superseded by ${supersededBy})` : ''}`);
 }
 
+// Serialize the fog the moment the dial names it (a write). Steering the state
+// never saw cannot drain confidence, warn a cold start, or survive a handoff.
+// A propose-only agent still gets the read — no footprint; an already-open fog
+// loop or a live unknown-map means the fog is already on the record. The loop
+// closes itself when the unknown-map artifact lands (artifacts.js). Returns
+// true only when a fog loop was actually written.
+function recordApertureFog(cwd, result) {
+  if (!result.mapRequired || proposeOnlyAgent()) return false;
+  const s = state.loadState(cwd);
+  const openFog = (s.openLoops || []).some(
+    (l) => l.status !== 'closed' && String(l.text || '').startsWith(schemas.FOG_LOOP_PREFIX)
+  );
+  const liveMap = (s.artifacts || []).some(
+    (a) => a.kind === 'unknown-map' && a.status !== 'retracted' && a.status !== 'superseded'
+  );
+  if (openFog || liveMap) return false;
+  const now = schemas.nowIso();
+  s.openLoops.push({
+    id: state.makeId('loop'),
+    at: now,
+    text: `${schemas.FOG_LOOP_PREFIX} (aperture ${result.level}, score ${result.score}/10) — run /ratchet:map; closes when the unknown-map artifact lands`,
+    status: 'open',
+  });
+  s.dirty = true;
+  s.history.push({ id: state.makeId('hist'), at: now, event: 'fog.recorded', note: `aperture ${result.level} raised mapRequired` });
+  state.saveState(cwd, s);
+  return true;
+}
+
 function cmdScore(cwd, sub, rest, asJson) {
   switch (sub) {
     case 'friction': {
@@ -458,7 +487,18 @@ function cmdScore(cwd, sub, rest, asJson) {
     }
     case 'aperture': {
       const result = scoring.scoreAperture(readPayload(rest[0]));
-      return out(asJson ? JSON.stringify(result, null, 2) : md.aperture(result));
+      // Serialize the fog on BOTH output modes — a mapRequired that lives only
+      // on stdout is the undrained-fog hole, and --json callers (the ones most
+      // likely to automate this read) must not silently bypass the write. The
+      // JSON result says whether the write happened (recordedFog).
+      const recordedFog = recordApertureFog(cwd, result);
+      if (asJson) return out(JSON.stringify({ ...result, recordedFog }, null, 2));
+      return out(
+        md.aperture(result) +
+          (recordedFog
+            ? '\n_Fog recorded as an open loop — it drains confidence until `/ratchet:map` lands the unknown-map artifact._'
+            : '')
+      );
     }
     default:
       throw new Error(`unknown score subcommand: ${sub} (friction | confidence | aperture)`);

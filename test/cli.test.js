@@ -716,5 +716,199 @@ ok('score confidence leaves no write footprint for a propose-only agent', () => 
   }
 });
 
+// --- probe + undrained fog (the fog gate's remaining holes) ------------------
+
+ok('score aperture serializes mapRequired fog as an open loop (not just stdout)', () => {
+  state.initProject(cwd, { force: true });
+  cli.run(['node', 'ratchet', 'score', 'aperture', '{"ambiguity":2,"terrain":2,"taste":2,"blastRadius":1,"reversibility":1}']);
+  const fogLoops = state.loadState(cwd).openLoops.filter((l) => /^fog: pre-build map required/.test(l.text));
+  assert.strictEqual(fogLoops.length, 1, 'the dial leaves the fog on the record, not only on stdout');
+  assert.strictEqual(fogLoops[0].status, 'open');
+  // a re-score does not stack a second drain
+  cli.run(['node', 'ratchet', 'score', 'aperture', '{"ambiguity":2,"terrain":2,"taste":2,"blastRadius":1,"reversibility":1}']);
+  assert.strictEqual(
+    state.loadState(cwd).openLoops.filter((l) => /^fog:/.test(l.text)).length, 1, 'fog loop is deduped'
+  );
+  // and recorded fog drains confidence like any open loop
+  assert.ok(
+    scoring.scoreConfidence(state.loadState(cwd)).penalties.some((p) => /open loop/.test(p.reason)),
+    'recorded fog drains confidence'
+  );
+});
+
+ok('a low-uncertainty aperture read leaves no fog footprint', () => {
+  state.initProject(cwd, { force: true });
+  cli.run(['node', 'ratchet', 'score', 'aperture', '{"ambiguity":0,"terrain":0,"taste":0,"blastRadius":1,"reversibility":0}']);
+  assert.strictEqual(state.loadState(cwd).openLoops.length, 0, 'no mapRequired → no fog loop');
+});
+
+ok('score aperture leaves no fog footprint for a propose-only agent', () => {
+  state.initProject(cwd, { force: true });
+  process.env.RATCHET_AGENT = 'ratchet-auditor';
+  try {
+    cli.run(['node', 'ratchet', 'score', 'aperture', '{"ambiguity":2,"terrain":2,"taste":2,"blastRadius":2,"reversibility":2}']);
+  } finally {
+    delete process.env.RATCHET_AGENT;
+  }
+  assert.strictEqual(state.loadState(cwd).openLoops.length, 0, 'a propose-only read leaves no write behind');
+});
+
+ok('the unknown-map artifact landing closes the fog loop the dial opened', () => {
+  state.initProject(cwd, { force: true });
+  cli.run(['node', 'ratchet', 'score', 'aperture', '{"ambiguity":2,"terrain":2,"taste":2,"blastRadius":1,"reversibility":1}']);
+  artifacts.addArtifact(cwd, {
+    kind: 'unknown-map', title: 'unknowns map: fixture', path: '.ratchet/unknowns-map.md',
+    status: 'handoff', holes: ['Q3 OPEN — route: probe'],
+  });
+  const fogLoops = state.loadState(cwd).openLoops.filter((l) => /^fog:/.test(l.text));
+  assert.ok(fogLoops.length >= 1, 'the fog loop is still on the record for provenance');
+  assert.ok(fogLoops.every((l) => l.status === 'closed'), 'the map landing closes the fog the dial recorded');
+});
+
+ok('probe lifecycle: the disposal hole drains until the gated retract clears it', () => {
+  state.initProject(cwd, { force: true });
+  const probe = artifacts.addArtifact(cwd, {
+    kind: 'probe', title: 'probe: does the seam double-fire?', holes: ['disposal: pending'],
+  });
+  assert.ok(
+    scoring.scoreConfidence(state.loadState(cwd)).penalties.some((p) => /holes/.test(p.reason)),
+    'a live probe drains confidence via its disposal hole'
+  );
+  // disposal reuses the gated verb — no silent disposal
+  assert.throws(() => cli.run(['node', 'ratchet', 'retract', probe.id]), /reason/);
+  cli.run(['node', 'ratchet', 'retract', probe.id, '--reason', 'disposed: code reverted; finding recorded as decision']);
+  const after = state.loadState(cwd);
+  assert.strictEqual(after.artifacts.find((a) => a.id === probe.id).status, 'retracted');
+  assert.ok(
+    !scoring.scoreConfidence(after).penalties.some((p) => /holes/.test(p.reason)),
+    'disposal stops the drain'
+  );
+});
+
+ok('cold-start reads probes correctly: disposed is healthy, live is residue, fog+build steering fails', () => {
+  const proj = path.join(tmp, 'fog-cold');
+  fs.mkdirSync(proj, { recursive: true });
+  state.initProject(proj, { force: true });
+  let st = state.loadState(proj);
+  st.objective = 'ship the probe gate';
+  st.nextAction = 'verify the fog checks';
+  st.nextCommand = '/ratchet:verify';
+  // a disposed probe as the most recent artifact is a COMPLETED build-for-learn
+  st.artifacts = [
+    { id: 'p1', title: 'probe: seam', kind: 'probe', status: 'retracted', retracted: { reason: 'disposed: finding recorded' } },
+  ];
+  state.saveState(proj, st);
+  let scan = coldStart.scan(proj);
+  const lvl = (frag) => (scan.checks.find((c) => c.name.includes(frag)) || {}).level;
+  assert.strictEqual(lvl('steering artifact is live'), 'ok', 'a disposed probe is not dead steering');
+  assert.strictEqual(lvl('probe code is disposed'), 'ok');
+  assert.strictEqual(lvl('build steering has no unmapped fog'), 'ok');
+  assert.strictEqual(scan.ok, true, 'a completed probe leaves a healthy cold start');
+
+  // "rebuild trust" is not build steering — fog + a non-build move stays ok
+  st = state.loadState(proj);
+  st.nextAction = 'rebuild the demo narrative';
+  st.openLoops = [{ id: 'l0', text: 'fog: pre-build map required (aperture A3, score 7/10)', status: 'open' }];
+  state.saveState(proj, st);
+  scan = coldStart.scan(proj);
+  assert.strictEqual(lvl('build steering has no unmapped fog'), 'ok', '"rebuild" must not read as build steering');
+
+  // now: undisposed residue + recorded fog + steering that says build anyway
+  st = state.loadState(proj);
+  st.nextCommand = '/ratchet:build';
+  st.artifacts.push({ id: 'p2', title: 'probe: taste', kind: 'probe', status: 'v0', holes: ['disposal: pending'] });
+  st.openLoops = [{ id: 'l1', text: 'fog: pre-build map required (aperture A3, score 7/10)', status: 'open' }];
+  state.saveState(proj, st);
+  scan = coldStart.scan(proj);
+  assert.strictEqual(lvl('probe code is disposed'), 'warn', 'live probe code is residue a cold session must not inherit');
+  assert.strictEqual(lvl('build steering has no unmapped fog'), 'fail', 'steering says build while fog is open');
+  assert.strictEqual(scan.ok, false);
+});
+
+ok('receipt carries the fog card — emptiness stated, residue warned', () => {
+  state.initProject(cwd, { force: true });
+  let r = receipt.assemble(cwd);
+  assert.ok(r.state.fog, 'fog card is always present');
+  assert.strictEqual(r.state.fog.probes.live, 0);
+  assert.ok(/Fog: none recorded/.test(md.receipt(r)), 'empty fog is stated, not omitted');
+
+  artifacts.addArtifact(cwd, { kind: 'unknown-map', title: 'unknowns map: fixture', holes: ['Q1 OPEN — route: user', 'Q2 OPEN — route: probe'] });
+  artifacts.addArtifact(cwd, { kind: 'probe', title: 'probe: q2', holes: ['disposal: pending'] });
+  r = receipt.assemble(cwd);
+  assert.strictEqual(r.state.fog.maps.length, 1);
+  assert.strictEqual(r.state.fog.maps[0].openItems, 2, 'map holes count as OPEN items');
+  assert.strictEqual(r.state.fog.probes.live, 1);
+  const rendered = md.receipt(r);
+  assert.ok(/Fog: 1 unknown-map \(2 OPEN item\(s\)\)/.test(rendered), 'fog renders in STATE');
+  assert.ok(/disposed or promoted/.test(rendered), 'a live probe carries its warning in the receipt');
+});
+
+ok('score aperture --json serializes fog too (no read-mode bypass) and reports it', () => {
+  state.initProject(cwd, { force: true });
+  const chunks = [];
+  const orig = process.stdout.write;
+  process.stdout.write = (str) => { chunks.push(String(str)); return true; };
+  try {
+    cli.run(['node', 'ratchet', 'score', 'aperture', '{"ambiguity":2,"terrain":2,"taste":2,"blastRadius":2,"reversibility":2}', '--json']);
+  } finally {
+    process.stdout.write = orig;
+  }
+  const parsed = JSON.parse(chunks.join(''));
+  assert.strictEqual(parsed.recordedFog, true, 'the JSON result says the fog write happened');
+  assert.strictEqual(
+    state.loadState(cwd).openLoops.filter((l) => /^fog:/.test(l.text)).length, 1,
+    'a --json consumer cannot bypass fog serialization'
+  );
+  // and the JSON path stays footprint-free for propose-only agents
+  state.initProject(cwd, { force: true });
+  process.env.RATCHET_AGENT = 'ratchet-auditor';
+  try {
+    const silent = [];
+    process.stdout.write = (str) => { silent.push(String(str)); return true; };
+    try {
+      cli.run(['node', 'ratchet', 'score', 'aperture', '{"ambiguity":2,"terrain":2,"taste":2,"blastRadius":2,"reversibility":2}', '--json']);
+    } finally {
+      process.stdout.write = orig;
+    }
+    assert.strictEqual(JSON.parse(silent.join('')).recordedFog, false, 'a propose-only read reports no write');
+  } finally {
+    delete process.env.RATCHET_AGENT;
+  }
+  assert.strictEqual(state.loadState(cwd).openLoops.length, 0, 'propose-only --json leaves no footprint');
+});
+
+ok('probe artifacts always receive the disposal hole (invariant, not convention)', () => {
+  state.initProject(cwd, { force: true });
+  const probe = artifacts.addArtifact(cwd, { kind: 'probe', title: 'probe: forgot the hole' });
+  assert.ok(probe.holes.some((h) => /disposal:\s*pending/i.test(h)), 'the boundary injects disposal: pending');
+  assert.ok(
+    scoring.scoreConfidence(state.loadState(cwd)).penalties.some((p) => /holes/.test(p.reason)),
+    'a hole-less probe still drains confidence'
+  );
+});
+
+ok('probe retraction must state its outcome: disposed or promoted (+ superseded-by)', () => {
+  state.initProject(cwd, { force: true });
+  const probe = artifacts.addArtifact(cwd, { kind: 'probe', title: 'probe: outcome gate' });
+  assert.throws(() => cli.run(['node', 'ratchet', 'retract', probe.id, '--reason', 'done']), /disposed|promoted/);
+  assert.strictEqual(
+    state.loadState(cwd).artifacts.find((a) => a.id === probe.id).status, 'v0',
+    'a vague reason does not dispose the probe'
+  );
+  assert.throws(
+    () => cli.run(['node', 'ratchet', 'retract', probe.id, '--reason', 'promoted: kept the fixture']),
+    /superseded-by/
+  );
+  cli.run(['node', 'ratchet', 'retract', probe.id, '--reason', 'promoted: rebuilt under proof gates', '--superseded-by', 'art-keep-1']);
+  const after = state.loadState(cwd).artifacts.find((a) => a.id === probe.id);
+  assert.strictEqual(after.status, 'retracted');
+  assert.strictEqual(after.retracted.supersededBy, 'art-keep-1');
+});
+
+ok('session confidence names recorded pressure, not correctness', () => {
+  const conf = scoring.scoreConfidence(state.loadState(cwd));
+  assert.ok(/recorded loop pressure, not correctness/.test(conf.scope), 'the scope says what the number is not');
+});
+
 fs.rmSync(tmp, { recursive: true, force: true });
 process.stdout.write(`\n${passed} passed\n`);

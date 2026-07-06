@@ -7,6 +7,63 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-07-06 — Probe Gate
+
+0.6 gated the fog: *no map → no confident build*. It left two holes: fog the dial named
+could live only on stdout (skipped maps leave no trace, so unrecorded uncertainty never
+drains confidence), and some fog cannot be mapped by reading or asking at all — it only
+appears by touching. The probe closes both: **a probe is a build whose proof-of-done is
+knowledge, not code.**
+
+### Added
+
+- **The probe — build-for-learn as a first-class map closure.** Known unknowns now close
+  by `user | territory | probe | parked | OPEN`, and `/ratchet:map` commissions a probe
+  (`templates/probe-card.md`: unknown · hypothesis · smallest reversible touch · allowed
+  surfaces · proof of learning · disposal rule · durable output · promotion rule · stop
+  condition) when only touching the repo can answer. No new schema: a probe is an
+  artifact (`kind:"probe"`, hole `disposal: pending`) whose hole drains confidence until
+  the code is disposed via the existing gated verb (`ratchet retract --reason`) or
+  explicitly promoted through a fresh `/ratchet:build` under the full proof/seam gates.
+  Both invariants are CLI-enforced, not conventions: `artifact add` injects the
+  `disposal: pending` hole on any probe that omits it, and a probe retraction must state
+  its outcome (`--reason` starting `disposed:` or `promoted:`; a promotion requires
+  `--superseded-by <the keep-build>`).
+  **Probe code dies; probe findings live** — as a decision, assumption, open loop,
+  defect, or map delta. `/ratchet:build` gained the build-for-learn mode (probe code is
+  never implementation progress); `/ratchet:handoff` surfaces probe outcomes so a
+  receiver cannot mistake residue for kept work.
+- **The undrained-fog fix: scored fog can no longer live only on stdout.**
+  `ratchet score aperture` with `mapRequired` now serializes the fog as an open loop
+  (`fog: pre-build map required …`) for writer callers on **both output modes** — text
+  and `--json` alike, so programmatic consumers cannot bypass the write (the JSON result
+  carries `recordedFog`); propose-only agents still get a footprint-free read — and
+  `artifact add kind:"unknown-map"` closes that loop when the map lands. Both ends live
+  at the CLI boundary, so fog the dial named drains confidence, warns cold starts, and
+  survives handoff even if the session never runs the map.
+- **Cold-start fog checks.** The control-plane scan now warns on live probe artifacts
+  (residue the next session could mistake for kept work) and FAILs when steering says
+  build while a `fog:` loop is open. A retracted probe is a *completed* probe, not dead
+  steering — the live-steering check exempts `kind:"probe"`.
+- **Receipt fog card.** STATE now carries `fog` (live unknown-maps with OPEN item counts,
+  unmapped fog loops, probes live/disposed) and renders it — emptiness stated
+  (`Fog: none recorded`), never omitted.
+- **Map convergence rule.** Every OPEN item leaving handover names its route out
+  (ask-user · probe · park owner+reason · assumption+killTest · defect). An OPEN item
+  with no route is a stall with a receipt, not mapped fog.
+- **Surprise tripwires for fog the dial never saw.** `/ratchet:attack` flags
+  wrong-premise findings as fog to serialize (not merely defects) and recommends
+  re-entering `/ratchet:map` at two or more; `/ratchet:build` re-runs the aperture after
+  two deviations (or one that reshapes the locked target) and stops when it says map.
+  These are **prompt-level** guidance, unlike the CLI-enforced pieces above (fog-loop
+  write/close, probe invariants, cold-start checks) — a session that skips the skills
+  skips the tripwires; only the dial's own reads are boundary-recorded.
+
+### Changed
+
+- Session confidence names its epistemics out loud: the scope now reads **recorded loop
+  pressure, not correctness** — unrecorded fog is invisible to it.
+
 ## [0.6.0] - 2026-07-06 — Fog Gate
 
 0.2 gated proof (*no proof → no keep*); 0.3 gated the *seam* of that proof
@@ -249,7 +306,8 @@ Initial public release.
 - Single-plugin marketplace manifest so the repo installs directly as a Claude Code plugin.
 - Zero-dependency smoke test suites for the state engine and the evolution helpers.
 
-[Unreleased]: https://github.com/TheLucidTech/torque-loop/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/TheLucidTech/torque-loop/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/TheLucidTech/torque-loop/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/TheLucidTech/torque-loop/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/TheLucidTech/torque-loop/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/TheLucidTech/torque-loop/compare/v0.3.0...v0.4.0

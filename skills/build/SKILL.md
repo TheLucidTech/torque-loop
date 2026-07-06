@@ -46,6 +46,23 @@ assumed, do not silently absorb it. Record a deviation (`templates/deviation-not
 `decision`, `openLoop`, or `defect`, and add it to the map's *Deviations during build*
 section. The map is a living record through the build, not a pre-build formality.
 
+**Re-score on surprise.** Two deviations — or one that reshapes the locked target — mean
+the aperture was scored too low. Re-run `ratchet score aperture`; if it now says
+`Pre-build map: required`, stop building and run `/ratchet:map`. Patching deeper into
+unmapped terrain is the confident-build-into-fog the dial exists to refuse.
+
+**Build-for-learn (probe mode).** If the active task is a probe (a live `kind:"probe"`
+artifact — see `templates/probe-card.md`), you are building to learn, not to keep:
+
+- Build only the smallest artifact that produces the card's proof-of-learning; stay
+  inside its allowed surfaces; stop at its stop condition.
+- The probe's completion is a map/state delta — a decision, assumption, open loop, or
+  defect — never a code diff. Probe code existing is not implementation progress; do not
+  claim it as such.
+- Then dispose: revert the code and `ratchet retract <probe-id> --reason "disposed: …"`.
+  Keeping probe code is a **promotion** — a fresh build-for-keep under the full proof/seam
+  gates, never a default. Undisposed probes drain confidence and flag the cold-start scan.
+
 For large or code-heavy artifacts, delegate to the `ratchet-builder` subagent.
 
 ## Output contract

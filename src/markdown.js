@@ -388,6 +388,17 @@ function receipt(r) {
     o.push('- Open defects: none');
   }
   o.push(`- Untested assumptions: ${r.state.untested} · open loops: ${r.state.openLoops}`);
+  const fog = r.state.fog || { maps: [], fogLoops: 0, probes: { live: 0, disposed: 0 } };
+  if (fog.maps.length || fog.fogLoops || fog.probes.live || fog.probes.disposed) {
+    const mapBit = fog.maps.length
+      ? `${fog.maps.length} unknown-map (${fog.maps.reduce((n, m) => n + m.openItems, 0)} OPEN item(s))`
+      : 'no unknown-map';
+    const probeBit = `probes: ${fog.probes.live} live / ${fog.probes.disposed} disposed`;
+    const residue = fog.probes.live ? ' — ⚠ live probe code must be disposed or promoted before ship' : '';
+    o.push(`- Fog: ${mapBit} · unmapped fog loops: ${fog.fogLoops} · ${probeBit}${residue}`);
+  } else {
+    o.push('- Fog: none recorded');
+  }
   if (r.state.git) {
     const cmp = (r.state.git.comparisons || []).map((c) => `${c.base} +${c.ahead}/-${c.behind}`).join(', ') || '—';
     o.push(`- Git: ${em(r.state.git.branch)} @ ${em(r.state.git.head)} — ${r.state.git.dirty ? 'dirty' : 'clean'} · vs ${cmp}`);
