@@ -206,9 +206,8 @@ when it isn't. In Codex, ask it to use the matching Torque Loop skill, for examp
 > unfamiliar terrain, reference-implementation ports, or "I'll know it when I see it"
 > taste. Walk the four unknown-quadrants (known knowns · known unknowns · unknown knowns ·
 > unknown unknowns) and hand over the map *before* `/ratchet:build`; at **A4**, stop after
-> the map until constraints are locked. The map, not code, is the deliverable — the
-> unknown found before code costs minutes; the same unknown found three PRs later costs the
-> three PRs.
+> the map until constraints are locked. What you deliver is the map, not a build — a wrong
+> assumption caught on the map is a one-line fix; caught mid-build it is a rewrite.
 
 ### Specialized
 

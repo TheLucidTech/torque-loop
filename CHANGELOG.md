@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`/ratchet:map` — the pre-build fog gate.** The loop had no pre-build ambiguity pass:
+  `/ratchet:cut` attacks assumptions, but nothing walked the codebase's tacit knowledge
+  before building. `/ratchet:map` walks high-uncertainty work (aperture A3–A4, unfamiliar
+  terrain, "I'll know it when I see it" taste, reference ports) through the four
+  unknown-quadrants — known knowns (settled ground with `file:line` evidence), known
+  unknowns (one blast-radius-ordered question at a time), unknown knowns (tacit taste
+  surfaced by putting concrete options in front of the user), unknown unknowns (a swept
+  landmine field) — and hands over one durable four-quadrant map, a build plan, and a
+  copy-paste implementation prompt before any code is written. CLI-backed
+  (`artifact kind:"unknown-map"`, decisions, assumptions, open loops), so its open items
+  drain `ratchet score confidence` until closed; no schema change. Method grafted from
+  dzhng/skills `explore-unknowns`, expressed in ratchet's own vocabulary. Aperture
+  auto-routing (scoring the task straight into the map) is deferred to a follow-up.
+
 ## [0.5.0] - 2026-07-04 — Receipt
 
 0.2 gated proof; 0.3 gated the *seam* of that proof; 0.4 metered the *depth* of the loop.
@@ -213,7 +229,7 @@ Initial public release.
 - Single-plugin marketplace manifest so the repo installs directly as a Claude Code plugin.
 - Zero-dependency smoke test suites for the state engine and the evolution helpers.
 
-[Unreleased]: https://github.com/TheLucidTech/torque-loop/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/TheLucidTech/torque-loop/compare/v0.5.0...HEAD
 [0.4.0]: https://github.com/TheLucidTech/torque-loop/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/TheLucidTech/torque-loop/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/TheLucidTech/torque-loop/compare/v0.1.0...v0.2.0

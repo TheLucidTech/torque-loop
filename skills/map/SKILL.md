@@ -1,24 +1,28 @@
 ---
 name: map
-description: Map the fog before you build. Use when uncertainty is high (aperture A3–A4), the terrain is unfamiliar, the taste is "I'll know it when I see it", or you are porting a reference implementation. Walks the task through four unknown-quadrants — known knowns (settled ground with file evidence), known unknowns (one blast-radius-ordered question at a time), unknown knowns (tacit taste surfaced by handing over something concrete to react to), and unknown unknowns (a swept landmine field) — then hands over one durable four-quadrant map, a tweakable build plan, and a copy-paste implementation prompt. The map, not code, is the deliverable; you do not build until it is handed over.
+description: Map the fog before you build. Use when uncertainty is high (aperture A3–A4), the terrain is unfamiliar, the taste is "I'll know it when I see it", or you are porting a reference implementation. Walks the task through four unknown-quadrants — known knowns (settled ground with file evidence), known unknowns (one blast-radius-ordered question at a time), unknown knowns (tacit taste surfaced by putting something concrete in front of the user), and unknown unknowns (a swept landmine field) — then hands over one durable four-quadrant map, a tweakable build plan, and a copy-paste implementation prompt. What you deliver is the map, not a build; you do not write code until it is handed over.
 ---
 
 # /ratchet:map — the fog-of-war gate
 
 When uncertainty is high, the expensive mistake is a confident build in the wrong
-direction. `/ratchet:lock` says: infer the missing value, name the assumption, move.
-That is correct for low-uncertainty work. This command is its counterweight for the
-high-uncertainty case — it maps the terrain *before* the build so you never spend three
-PRs discovering what one code read would have shown. **The map, not code, is the
-deliverable.** You do not build until it is handed over.
+direction. `/ratchet:lock` says: infer the missing value, name the assumption, move. That
+is correct for low-uncertainty work. This command is its counterweight for the
+high-uncertainty case — it maps the terrain *before* the build, so a wrong assumption is a
+one-line correction on paper instead of a rewrite three PRs deep. **What you deliver is the
+map, not a build.** You do not write code until it is handed over.
+
+> Method grafted from the `explore-unknowns` skill; expressed in ratchet's own vocabulary —
+> general mechanism, own words, backed by ratchet state. (Same graft discipline as the
+> aperture dial.)
 
 Two moves make the walk work:
 
-- **Reacting beats imagining.** Never ask the user to describe intent from a blank page.
-  Hand over something concrete — a sample, a mock, competing design directions — and let
-  them react. Recognition is cheap; invention is expensive.
-- **Every artifact assembles the reply.** End each turn with lettered options the user can
-  answer in a few characters, so they react instead of composing.
+- **Show, don't ask.** Never make the user describe intent from a blank page. Put something
+  concrete in front of them — a sample, a throwaway mock, a few competing directions — and
+  let them point at it. Recognition is cheap; invention is expensive.
+- **Pre-draft their reply.** Close each turn with lettered options answerable in a few
+  characters, so the user reacts instead of composing.
 
 ## Step 0 — Load state, then scan the terrain
 
@@ -36,9 +40,9 @@ user's attention.
 Walk the four quadrants **in order**, naming the current one. Disclose material findings
 the moment you hit them; never close a quadrant off-screen.
 
-1. **Known knowns — settle the ground.** State the facts, each cited to `file:line`.
-   Mark every assumption *separately* and flag it "settled unless you say otherwise", so
-   a wrong premise gets corrected now instead of after the build.
+1. **Known knowns — settle the ground.** State the facts, each cited to `file:line`. Mark
+   every assumption *separately* and say you will treat it as true until corrected, so a
+   wrong premise gets caught now instead of after the build.
 
 2. **Known unknowns — one question at a time.** Ask the single highest-blast-radius
    question first (the answer that reshapes the most), not a wall of them. Give lettered
@@ -47,16 +51,17 @@ the moment you hit them; never close a quadrant off-screen.
    finding), or **OPEN** (deferred, with what would unblock it).
 
 3. **Unknown knowns — extract the tacit.** The user cannot articulate what they don't know
-   they know. Do not ask abstractly. Hand over something concrete to react to — sample
-   data, a throwaway mock, three or four incompatible renderings of the same thing — and
-   let the reaction reveal the taste. Probe the offhand context: who consumes this, where
-   it runs, what "done" looks like to whoever inherits it. Record what each reaction changes.
+   they know. Do not ask abstractly. Put something concrete in their hands — sample data, a
+   throwaway mock, three or four incompatible renderings of the same thing — and let the
+   reaction expose the taste. Probe the offhand context: the downstream consumer, the
+   runtime it lands in, the acceptance bar of whoever owns it next. Record what each
+   reaction changes.
 
-4. **Unknown unknowns — sweep for landmines.** Hunt the silent failure modes a shallow
-   read misses: wrong-by-default data, stale denormalizations, **unwritten conventions**
-   the code enforces but no doc records, **half-built or reverted prior attempts (and why
-   they died — the reason is usually the landmine)**, and latent bugs this path inherits.
-   Worst first. Each as a card:
+4. **Unknown unknowns — sweep for landmines.** Hunt the silent failure modes a shallow read
+   misses: wrong-by-default data, stale denormalizations, **unwritten conventions** the code
+   enforces but no doc records, **prior attempts that were abandoned or rolled back — the
+   reason they died is usually the trap you are about to re-hit**, and latent bugs this path
+   inherits. Worst first. Each as a card:
 
    ```
    evidence: <file:line>   why it bites: <mechanism>   what it changes: <task impact>
@@ -75,7 +80,7 @@ QUADRANT WALK: current <quadrant> · coverage <n/4> · stopped for user reaction
 
 KNOWN KNOWNS:
 - <settled fact> — evidence: <file:line>
-- <assumption> — settled unless challenged
+- <assumption> — treated as true until challenged
 
 KNOWN UNKNOWNS:
 - Q: <question> | recommend: <lettered answer> | closed by: user | territory | OPEN | unblocks: <what>
