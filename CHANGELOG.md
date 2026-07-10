@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **README product thesis — verified guardrails lift cognitive load.** The README now
+  states the payoff the execution framing only implied: externalized state lets the agent
+  run on a smaller working set and spend its scarce attention on judgment, not bookkeeping.
+  It names the precondition out loud — *a guardrail only lifts load in proportion to how
+  far you can trust it without re-checking it; an unverified guardrail is a liability
+  wearing the costume of relief* — and reframes the existing **no proof → no keep** /
+  **wrong proof → no ship** gates as the price of being allowed to stop re-checking, not
+  ceremony. Guarded against silent drift by a `plugin-shape` assertion (the thesis is
+  load-bearing, so its removal fails CI like a stale version) — docs + drift guard, no
+  runtime change.
+
 ## [0.7.0] - 2026-07-06 — Probe Gate
 
 0.6 gated the fog: *no map → no confident build*. It left two holes: fog the dial named
