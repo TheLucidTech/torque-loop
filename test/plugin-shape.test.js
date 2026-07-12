@@ -80,6 +80,30 @@ ok('hooks/hooks.json exists and parses', () => {
   assert.ok(hooks.hooks, 'hooks.json has a hooks map');
 });
 
+ok('every hooks.json command resolves to a real CLI hook subcommand', () => {
+  // cmdHook's default: returns silently (hooks must never break a session), so a
+  // renamed or misspelled subcommand in hooks.json would no-op forever in every
+  // installed copy. This is the only tripwire for that drift.
+  const hooks = readJson('hooks/hooks.json');
+  const wired = [];
+  for (const entries of Object.values(hooks.hooks)) {
+    for (const entry of entries) {
+      for (const h of entry.hooks || []) {
+        const m = /bin\/ratchet"?\s+hook\s+([a-z][a-z-]*)/.exec(h.command || '');
+        assert.ok(m, `hook command is a ratchet hook invocation: ${h.command}`);
+        wired.push(m[1]);
+      }
+    }
+  }
+  assert.ok(wired.length >= 3, 'hooks.json wires at least session-start, post-edit, stop-check');
+  const body = /function cmdHook[\s\S]*?\r?\n\}/.exec(read('src/cli.js'));
+  assert.ok(body, 'src/cli.js defines cmdHook');
+  const handled = new Set(Array.from(body[0].matchAll(/case '([^']+)':/g), (m) => m[1]));
+  for (const sub of wired) {
+    assert.ok(handled.has(sub), `hooks.json wires "hook ${sub}" but cmdHook does not handle it (silent no-op)`);
+  }
+});
+
 ok('every bin target from package.json exists', () => {
   for (const [name, rel] of Object.entries(pkg.bin || {})) {
     assert.ok(exists(rel), `bin ${name} -> ${rel} exists`);
@@ -132,9 +156,37 @@ ok('README command list matches the skill folders', () => {
   }
 });
 
+ok('README version examples match package.json (readouts must not drift)', () => {
+  // The project's whole claim is state/readout trust — a README that shows a
+  // stale `ratchet --version` output is the exact poison the receipt hunts.
+  // Any `-> ratchet <semver>` example in the README is a version surface.
+  const readme = read('README.md');
+  const hits = readme.match(/->\s*ratchet\s+\d+\.\d+\.\d+/g) || [];
+  assert.ok(hits.length >= 1, 'README shows a ratchet --version example');
+  for (const hit of hits) {
+    const v = hit.match(/(\d+\.\d+\.\d+)/)[1];
+    assert.strictEqual(v, pkg.version, `README version example "${hit.trim()}" matches package.json`);
+  }
+});
+
 ok('README does not mention removed command names', () => {
   const readme = read('README.md');
   assert.ok(!readme.includes('/ratchet:ratchet-evolve'), 'no stale /ratchet:ratchet-evolve in README');
+});
+
+ok('README states the product thesis: verified guardrails lift load, unverified ones add it', () => {
+  // The product thesis is load-bearing, not decoration. Torque Loop's pitch is that
+  // externalized *verified* state lifts the agent's cognitive load — and that the lift is
+  // conditional: an unverified guardrail is a liability, not relief, because it hides load
+  // instead of removing it. If that precondition silently drops out of the README, the
+  // whole apparatus reads as ceremony and the proof/seam gates look like bureaucracy. So
+  // guard it like a stale version. Tolerant to wording; pins the two load-bearing halves.
+  const readme = read('README.md');
+  assert.ok(/cognitive load/i.test(readme), 'README names the cognitive-load payoff');
+  assert.ok(
+    /unverified guardrail/i.test(readme) && /liabilit/i.test(readme),
+    'README states an unverified guardrail is a liability, not relief'
+  );
 });
 
 ok('the /ratchet:map fog gate is wired into the prompt catalog', () => {
@@ -168,6 +220,53 @@ ok('the probe primitive threads map → build → handoff with a disposal rule',
   assert.ok(/probe/i.test(read('skills/handoff/SKILL.md')), 'handoff surfaces probe outcomes');
   assert.ok(/probe/i.test(read('reference/PROMPTS.md')), 'the prompt source of truth knows the probe closure');
   assert.ok(/probe/i.test(read('templates/unknowns-map.md')), 'the map template offers probe as a closure');
+});
+
+ok('the skill graph is derived from source, not remembered (drift guard)', () => {
+  // reference/graph/torque-loop.cypher is a knowledge graph of the skills. The whole point
+  // of committing it is that it is DERIVED: scripts/graph-gen.js reads skills/*/SKILL.md +
+  // PROMPTS.md and emits it. A hand-edited or stale graph is the exact liability the README
+  // names — a guardrail you trust without re-checking. So byte-match the committed file
+  // against a fresh generation; drift fails CI like a stale version. Normalize CRLF only so a
+  // clone whose autocrlf touched the file still checks content, not line endings (convention 16).
+  const graphGen = require('../scripts/graph-gen');
+  assert.ok(exists(graphGen.OUT_REL), 'reference/graph/torque-loop.cypher exists');
+  const committed = read(graphGen.OUT_REL).replace(/\r\n/g, '\n');
+  const generated = graphGen.buildCypher();
+  assert.strictEqual(
+    committed,
+    generated,
+    'reference/graph/torque-loop.cypher is stale — run: node scripts/graph-gen.js'
+  );
+});
+
+ok('the skill graph covers every skill and rebuilds cleanly', () => {
+  // Two structural invariants a pure byte-match would let regress silently:
+  // (1) every skill folder appears as a node — a skill added without regenerating is caught;
+  // (2) the delete-and-rebuild preamble survives — without it the reload is only additive and
+  //     a shrunk/reordered graph leaves stale STEP edges (the idempotency hole this closed).
+  const cypher = require('../scripts/graph-gen').buildCypher();
+  for (const name of skillDirs) {
+    assert.ok(
+      cypher.includes(`RatchetSkill {ns: 'torque-loop', name: '${name}'}`),
+      `skill "${name}" is a node in the graph`
+    );
+  }
+  assert.ok(
+    /MATCH \(n \{ns: 'torque-loop'\}\) DETACH DELETE n;/.test(cypher),
+    'the graph load starts with a namespace-scoped delete-and-rebuild'
+  );
+});
+
+ok('the graph README parks the aperture cross-links instead of smuggling them in', () => {
+  // The honest-scope boundary is load-bearing: the derived graph deliberately omits the
+  // aperture cross-links (a separate repo, never adversarially attacked) and documents that
+  // as a parked decision with an owner. If that note silently vanishes, the next author may
+  // re-add unverified edges as if they were canon. Guard the boundary like the README thesis.
+  assert.ok(exists('reference/graph/README.md'), 'reference/graph/README.md exists');
+  const doc = read('reference/graph/README.md');
+  assert.ok(/PARKED/.test(doc), 'README marks the aperture cross-links as PARKED');
+  assert.ok(/aperture/i.test(doc), 'README names the aperture bridge as the parked scope');
 });
 
 process.stdout.write(`\n${passed} passed\n`);
